@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Spielerstatistik</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- jsPDF (UMD) für PDF-Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+
+  <!-- SPIELERAUSWAHL -->
+  <div id="playerSelectionPage" class="page">
+    <h1>PLAYER SELECTION</h1>
+    <p class="center-text">Wähle die Spieler, die in der Tabelle angezeigt werden sollen</p>
+    <ul id="playerList" class="player-list"></ul>
+    <button id="confirmSelection" class="confirm-btn">Bestätigen</button>
+  </div>
+
+  <!-- STATS SEITE -->
+  <div id="statsPage" class="page" style="display:none;">
+    <div class="page-top">
+      <div class="top-bar">
+        <button id="timerBtn" class="top-btn timer timer-left reset" aria-label="Spieluhr">00:00</button>
+        <button id="selectPlayersBtn" class="top-btn">Spieler wählen</button>
+        <button id="torbildBtn" class="top-btn">Goal Map</button>
+        <button id="goalValueBtn" class="top-btn">Goal Value</button>
+        <button id="exportSeasonFromStatsBtn" class="top-btn export-season">Export Season</button>
+        <button id="seasonBtn" class="top-btn season-highlight">Season</button>
+        <button id="seasonMapBtn" class="top-btn season-highlight">Season Map</button>
+        <button id="exportBtn" class="top-btn export-csv">Export CSV</button>
+        <button id="resetBtn" class="top-btn danger-btn reset-btn">Reset</button>
+      </div>
+    </div>
+
+    <h1>GAME DATA</h1>
+
+    <div id="statsScrollContainer">
+      <div id="statsContainer"></div>
+    </div>
+  </div>
+
+  <!-- GOAL MAP SEITE -->
+  <div id="torbildPage" class="page" style="display:none;">
+    <div class="page-top">
+      <div class="top-bar">
+        <button id="backToStatsBtn" class="top-btn back-btn">← Zurück</button>
+        <button id="exportSeasonMapBtn" class="top-btn export-season">Export Season Map</button>
+        <button id="resetTorbildBtn" class="top-btn danger-btn reset-btn">Reset</button>
+      </div>
+    </div>
+
+    <h1>GOAL MAP</h1>
+
+    <div class="torbild-layout">
+      <div class="field-column">
+        <div class="img-box field-box" id="fieldBox">
+          <img src="Spielfeld Overlay.png" alt="Spielfeld Overlay" />
+        </div>
+      </div>
+
+      <div class="goal-column">
+        <div class="img-box goal-img-box" id="goalGreenBox">
+          <img src="Tor Grün.png" alt="Tor (Grün)" />
+        </div>
+
+        <div class="img-box goal-img-box" id="goalRedBox">
+          <img src="Tor Rot.png" alt="Tor (Rot)" />
+        </div>
+
+        <div class="time-tracking-box" id="timeTrackingBox">
+          <div class="period" data-period="p1">
+            <div class="period-title">1st Period</div>
+            <div class="period-buttons top-row">
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+            </div>
+            <div class="period-numbers">
+              <span class=" num-center">19 - 15</span>
+              <span class="num-center">14 - 10</span>
+              <span class="num-center">9 - 5</span>
+              <span class="num-center">4 - 0</span>
+            </div>
+            <div class="period-buttons bottom-row">
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+            </div>
+          </div>
+
+          <div class="period" data-period="p2">
+            <div class="period-title">2nd Period</div>
+            <div class="period-buttons top-row">
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+            </div>
+            <div class="period-numbers">
+              <span class=" num-center">19 - 15</span>
+              <span class="num-center">14 - 10</span>
+              <span class="num-center">9 - 5</span>
+              <span class="num-center">4 - 0</span>
+            </div>
+            <div class="period-buttons bottom-row">
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+            </div>
+          </div>
+
+          <div class="period" data-period="p3">
+            <div class="period-title">3rd Period</div>
+            <div class="period-buttons top-row">
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+            </div>
+            <div class="period-numbers">
+              <span class=" num-center">19 - 15</span>
+              <span class="num-center">14 - 10</span>
+              <span class="num-center">9 - 5</span>
+              <span class="num-center">4 - 0</span>
+            </div>
+            <div class="period-buttons bottom-row">
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GOAL VALUE PAGE -->
+  <div id="goalValuePage" class="page" style="display:none;">
+    <div class="page-top">
+      <div class="top-bar">
+        <button id="backFromGoalValueBtn" class="top-btn back-btn">← Zurück</button>
+        <button id="resetGoalValueBtn" class="top-btn danger-btn reset-btn">Reset</button>
+      </div>
+    </div>
+
+    <div style="margin-top:18px; padding:10px;">
+      <h1>GOAL VALUE</h1>
+      <div id="goalValueContainer"></div>
+    </div>
+  </div>
+
+  <!-- SEASON MAP PAGE -->
+  <div id="seasonMapPage" class="page" style="display:none;">
+    <div class="page-top">
+      <div class="top-bar">
+        <button id="backToStatsFromSeasonMapBtn" class="top-btn back-btn">← Zurück</button>
+        <button id="exportSeasonMapPageBtn" class="top-btn export-csv">Export</button>
+        <button id="resetSeasonMapBtn" class="top-btn danger-btn reset-btn">Reset</button>
+      </div>
+    </div>
+
+    <div style="margin-top:18px; padding:10px;">
+      <h1>SEASON MAP</h1>
+    </div>
+
+    <div class="torbild-layout">
+      <div class="field-column">
+        <div class="img-box field-box" id="seasonFieldBox">
+          <img src="Spielfeld Overlay.png" alt="Spielfeld Overlay" />
+        </div>
+      </div>
+
+      <div class="goal-column">
+        <div class="img-box goal-img-box" id="seasonGoalGreenBox">
+          <img src="Tor Grün.png" alt="Tor (Grün)" />
+        </div>
+
+        <div class="img-box goal-img-box" id="seasonGoalRedBox">
+          <img src="Tor Rot.png" alt="Tor (Rot)" />
+        </div>
+
+        <div class="time-tracking-box" id="seasonMapTimeTrackingBox">
+          <div class="period" data-period="sp1">
+            <div class="period-title">1st Period</div>
+            <div class="period-buttons top-row">
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+            </div>
+            <div class="period-numbers">
+              <span class=" num-center">19 - 15</span>
+              <span class="num-center">14 - 10</span>
+              <span class="num-center">9 - 5</span>
+              <span class="num-center">4 - 0</span>
+            </div>
+            <div class="period-buttons bottom-row">
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+              <button class="time-btn">0</button>
+            </div>
+          </div>
+          <!-- weitere Perioden analog -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEASON SEITE -->
+  <div id="seasonPage" class="page" style="display:none;">
+    <div class="page-top">
+      <div class="top-bar">
+        <button id="backToStatsFromSeasonBtn" class="top-btn">← Zurück</button>
+        <button id="exportSeasonBtn" class="top-btn export-csv">Export CSV</button>
+        <button id="resetSeasonBtn" class="top-btn danger-btn reset-btn">Reset</button>
+      </div>
+    </div>
+
+    <h1>SEASON</h1>
+    <div id="seasonContainer"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="season_map_momentum.js"></script>
+</body>
+</html>
