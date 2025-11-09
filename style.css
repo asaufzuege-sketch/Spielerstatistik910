@@ -1,0 +1,397 @@
+:root {
+  /* Grundfarben Light Mode */
+  --bg-color: #ffffff;
+  --text-color: #000000;
+  --header-bg: #1E1E1E;
+  --row-even: #f0f0f0;
+  --row-odd: #e0e0e0;
+
+  /* Seiten-Titelfarben / Gradient */
+  --page-title-start: #7dceb6; /* oben links */
+  --page-title-end: #66a895;   /* unten rechts */
+
+  /* Tabellenfarben */
+  --cell-pos-color: #00c06f;
+  --cell-neg-color: #ff4c4c;
+  --cell-zero-color: #000000;
+
+  /* Buttons / Timer */
+  --btn-top-bg: #c8fbc8;
+  --btn-bottom-bg: #ffe7e7;
+  --timer-active-color: #005c2f;
+  --timer-left-bg: #3b3b3b;
+
+  /* Layout */
+  --sticky-header-height: 56px;
+
+  /* Torbildfarben */
+  --ice-top: #00c06f;
+  --ice-bottom: #ff4c4c;
+}
+
+/* Dark Mode */
+[data-theme="dark"] {
+  --bg-color: #111111;
+  --text-color: #ffffff;
+  --header-bg: #1E1E1E;
+  --row-even: #333333;
+  --row-odd: #4a4a4a;
+
+  --cell-pos-color: #00ff80;
+  --cell-neg-color: #ff4c4c;
+  --cell-zero-color: #ffffff;
+  --timer-left-bg: #3b3b3b;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.page {
+  width: 100%;
+  max-width: 1100px;
+}
+
+/* Page-top: per-page container for centered buttons */
+.page-top {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+/* =========================================
+   TYPOGRAFIE / TITEL
+   ========================================= */
+/* Seiten-Titel: gradient text, uppercase */
+h1 {
+  text-align: center;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  font-weight: 700;
+  /* gradient text using background-clip */
+  background: linear-gradient(135deg, var(--page-title-start) 0%, var(--page-title-end) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Larger title appearance for specific pages */
+#goalValuePage h1,
+#seasonPage h1,
+#seasonMapPage h1,
+#playerSelectionPage h1 {
+  font-family: "Astroz", "Segoe UI", sans-serif;
+  font-size: 1.69em;
+  margin: 0 0 12px 0;
+}
+
+/* center text, small */
+.center-text {
+  text-align: center;
+  color: #888;
+  margin-top: 6px;
+}
+
+/* =========================================
+   SPIELERAUSWAHL
+   ========================================= */
+.player-list {
+  list-style: none;
+  padding: 0;
+  margin: 20px auto;
+  max-width: 600px;
+}
+
+.player-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--header-bg);
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin: 6px 0;
+}
+
+.player-list li span {
+  color: #fff;
+}
+
+/* Checkbox-Farbe on selection page */
+#playerSelectionPage input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #e3fba7; /* neue Checkbox-Farbe */
+}
+
+.player-list .num {
+  width: 48px;
+  text-align: center;
+  font-weight: 700;
+  color: #fff;
+}
+
+.player-list input[type="text"] {
+  background: var(--row-even);
+  color: var(--text-color);
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 6px 8px;
+  flex: 1;
+}
+
+/* Confirm button on selection page (new color) */
+#playerSelectionPage .confirm-btn {
+  display: block;
+  margin: 20px auto;
+  padding: 8px 14px;
+  background: #e3fba7;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  color: #000;
+  font-weight: 400;
+  height: 40px;
+  line-height: 24px;
+  transition: background 0.2s;
+}
+#playerSelectionPage .confirm-btn:hover { filter: brightness(0.98); }
+
+/* =========================================
+   TOP BAR / BUTTONS
+   ========================================= */
+.top-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+/* Base top button styling - uniform height; not bold (except reset) */
+.top-btn {
+  background: #2b2b2b;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.2s;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 400;
+  box-sizing: border-box;
+}
+.top-btn:hover { background: #3b3b3b; }
+
+/* special lighter timer on the left - increase font size and bold */
+.top-btn.timer-left {
+  background: var(--timer-left-bg);
+}
+.timer {
+  font-size: 1.25rem;    /* larger */
+  font-weight: 700;      /* bold */
+  padding: 10px 16px;
+  transition: background-color 0.25s;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.timer.running { background: var(--cell-pos-color); }
+.timer.stopped { background: #b00020; }
+.timer.reset { background: var(--timer-left-bg); }
+
+/* Export CSV button (used on Game Data and Season pages) - same color everywhere */
+.top-btn.export-csv {
+  background: #46798e;
+  color: #fff;
+}
+.top-btn.export-csv:hover { filter: brightness(0.95); }
+
+/* Season highlight */
+.top-btn.season-highlight {
+  background: #44bb91;
+  color: #fff;
+}
+.top-btn.season-highlight:hover { filter: brightness(0.95); }
+
+/* Export Season (from stats) button color kept distinct */
+.top-btn.export-season {
+  background: #e3fba7;
+  color: #000;
+}
+.top-btn.export-season:hover { filter: brightness(0.95); }
+
+/* Import CSV button (dynamically created) - ensure it matches top-btn sizing */
+.import-csv-btn {
+  background: #010741;
+  color: #fff;
+}
+
+/* Danger / reset buttons - Reset remains bold */
+.danger-btn { background: #8b0000; color: #fff; }
+.danger-btn:hover { background: #a30000; }
+.reset-btn { font-weight: 700; }
+
+/* =========================================
+   STATISTIK-TABELLE
+   ========================================= */
+#statsScrollContainer { max-height: none; overflow-y: visible; }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+
+thead th {
+  background: var(--header-bg);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 8px 6px;
+  border-bottom: 2px solid #333;
+  text-align: center;
+}
+thead th:nth-child(2) { text-align: left; padding-left: 12px; }
+
+th, td {
+  padding: 8px 6px;
+  text-align: center;
+  border-bottom: 1px solid #333;
+  color: var(--text-color);
+}
+
+.even-row { background-color: var(--row-even); }
+.odd-row  { background-color: var(--row-odd); }
+
+td[data-player] { cursor: pointer; transition: transform 0.08s, background 0.08s; }
+td[data-player]:active { transform: scale(1.12); background: #222; }
+
+/* Time button read-only appearance */
+.time-btn[disabled], .time-btn.disabled-readonly { opacity: 0.7; cursor: default; pointer-events: none; filter: brightness(0.95); }
+
+th.sortable { user-select: none; }
+th .sort-arrow { font-size: 0.7rem; color: #ddd }
+
+/* =========================================
+   TORBILD / GOAL MAP
+   ========================================= */
+.torbild-layout {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 20px;
+  height: calc(100vh - 120px);
+  margin-top: 20px;
+}
+.field-column { flex: 1; display: flex; justify-content: center; }
+.field-box, .img-box {
+  background: #1e1e1e;
+  border: 2px solid #333;
+  border-radius: 10px;
+  padding: 5px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.field-box img, .img-box img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
+.goal-column { flex: 1; display: flex; flex-direction: column; gap: 15px; }
+
+.marker-dot {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+}
+
+/* =========================================
+   ZEITERFASSUNG
+   ========================================= */
+.time-tracking-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: #1a1a1a;
+  border: 2px solid #333;
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 0.95rem;
+  height: 100%;
+  gap: 10px;
+}
+.period {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: auto minmax(1.4em, auto) auto;
+  align-items: center;
+  justify-items: center;
+  row-gap: 2px;
+  column-gap: 12px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 8px;
+}
+.period-title { grid-column: 1 / -1; font-weight: bold; text-align: center; margin-bottom: 4px; font-size: 0.85rem; }
+.period-buttons.top-row, .period-buttons.bottom-row, .period-numbers { display: contents; }
+.period-numbers span { color: #ccc; font-size: 0.8rem; line-height:1; }
+
+.time-btn {
+  width: 100%;
+  height: 20px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.2s;
+}
+.period-buttons.top-row .time-btn { background: var(--btn-top-bg); }
+.period-buttons.bottom-row .time-btn { background: var(--btn-bottom-bg); }
+.period-buttons.top-row .time-btn:hover { background-color: #b2f0b2; }
+.period-buttons.bottom-row .time-btn:hover { background-color: #ffd3d3; }
+.time-btn:active { transform: scale(1.05); }
+
+/* =========================================
+   SEASON PAGE & TOTAL ROW
+   ========================================= */
+#seasonPage table { width: auto; table-layout: auto; border-collapse: collapse; font-size: 0.95rem; margin: 0 auto; }
+#seasonPage th, #seasonPage td { padding: 8px 6px; text-align: center; border-bottom: 1px solid #333; color: var(--text-color); white-space: nowrap; }
+#seasonPage thead th { background: var(--header-bg); position: sticky; top: 0; z-index: 40; padding: 8px 6px; border-bottom: 2px solid #333; text-align:center; }
+#seasonPage tr:nth-child(even) { background-color: var(--row-even); }
+#seasonPage tr:nth-child(odd) { background-color: var(--row-odd); }
+#seasonPage .total-row td { background: var(--header-bg) !important; color: var(--text-color) !important; font-weight:700 !important; border-top:2px solid #333; }
+
+.goalvalue-title-input {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  padding: 4px 6px;
+  color: inherit;
+  text-align: center;
+}
+
+/* responsive */
+@media (max-width: 900px) {
+  .torbild-layout { flex-direction: column; height: auto; }
+  .goalvalue-title-input { font-size: 0.85rem; }
+  .top-bar { gap: 6px; }
+}
