@@ -1,15 +1,17 @@
 // enhancements-wakelock.js
-// Adds a "Display always on" toggle to keep the screen awake.
+// Robust variant: ensures the "Display always on" button is created even if top-bar / import button are added later,
+// logs helpful diagnostics to console, and attempts multiple insertion strategies.
 // - Uses Screen Wake Lock API if available
-// - Falls back to NoSleep.js (loaded from CDN) if Wake Lock not supported
+// - Falls back to NoSleep.js (CDN) if needed
 // - Persists requested state in localStorage ('keepScreenOn')
-// - Re-acquires wake lock on visibilitychange / page show when appropriate
+// - Re-acquires lock on visibilitychange when possible
 // - Releases on toggle off / unload
 //
-// NOTE: place <script src="enhancements-wakelock.js"></script> after app.js in index.html
+// Place <script src="enhancements-wakelock.js"></script> after app.js in index.html
 (function () {
   const STORAGE_KEY = 'keepScreenOn';
   const NO_SLEEP_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/no-sleep/0.12.0/NoSleep.min.js';
+  const BTN_ID = 'displayWakeLockBtn';
 
   let wakeLock = null;
   let noSleep = null;
@@ -17,7 +19,6 @@
 
   function log(...args) { console.debug('[wakelock]', ...args); }
 
-  // Request screen wake lock (Screen Wake Lock API)
   async function requestWakeLockAPI() {
     if (!('wakeLock' in navigator)) return false;
     try {
@@ -35,7 +36,6 @@
     }
   }
 
-  // Release wake lock if held
   async function releaseWakeLockAPI() {
     try {
       if (wakeLock && typeof wakeLock.release === 'function') {
@@ -49,22 +49,18 @@
     }
   }
 
-  // Dynamically load NoSleep.js if not present
   function loadNoSleepScript() {
     return new Promise((resolve, reject) => {
       if (window.NoSleep) return resolve(window.NoSleep);
       const s = document.createElement('script');
       s.src = NO_SLEEP_CDN;
       s.crossOrigin = 'anonymous';
-      s.onload = () => {
-        resolve(window.NoSleep);
-      };
-      s.onerror = () => reject(new Error('NoSleep load failed'));
+      s.onload = () => resolve(window.NoSleep);
+      s.onerror = (e) => reject(new Error('NoSleep load failed'));
       document.head.appendChild(s);
     });
   }
 
-  // Enable NoSleep fallback (plays tiny muted looping video under user gesture)
   async function enableNoSleep() {
     try {
       const NoSleepCtor = window.NoSleep || (await loadNoSleepScript());
@@ -82,7 +78,6 @@
     }
   }
 
-  // Disable NoSleep
   function disableNoSleep() {
     try {
       if (noSleep && typeof noSleep.disable === 'function') {
@@ -97,9 +92,7 @@
     }
   }
 
-  // Try to acquire some form of wake lock (API preferred, fallback to NoSleep)
   async function enableKeepScreenOn() {
-    // Must be called from user gesture to work reliably
     let ok = false;
     if ('wakeLock' in navigator) {
       ok = await requestWakeLockAPI();
@@ -117,177 +110,226 @@
     }
   }
 
-  // Release any acquired wake locks
   async function disableKeepScreenOn() {
-    try {
-      await releaseWakeLockAPI();
-    } catch (e) {}
+    try { await releaseWakeLockAPI(); } catch (e) {}
     disableNoSleep();
     localStorage.setItem(STORAGE_KEY, '0');
     updateButtonState(false);
   }
 
-  // Re-request wake lock after visibilitychange (if previously requested)
   async function handleVisibilityChange() {
     try {
       if (document.visibilityState === 'visible') {
         const wanted = localStorage.getItem(STORAGE_KEY) === '1';
         if (wanted) {
-          // If API is available, re-acquire. If using NoSleep previously, re-enable it.
           if ('wakeLock' in navigator) {
             await requestWakeLockAPI();
+            updateButtonState(Boolean(wakeLock));
           } else if (!usingNoSleep) {
             await enableNoSleep();
+            updateButtonState(Boolean(usingNoSleep));
           }
         }
-      } else {
-        // page hidden: Wake Lock may be auto-released by UA, we'll re-acquire on visible
       }
     } catch (e) {
       console.warn('Visibility handler error:', e);
     }
   }
 
-  // Create the toggle button in the Stats top-bar
-  function createToggleButton() {
-    // ensure top-bar exists
-    const topBar = document.querySelector('#statsPage .top-bar');
-    if (!topBar) return null;
-    if (document.getElementById('displayWakeLockBtn')) return document.getElementById('displayWakeLockBtn');
+  // Utility: prefer top-bar insertion but keep trying until it exists
+  function findTopBar() {
+    return document.querySelector('#statsPage .top-bar') || document.querySelector('.top-bar');
+  }
 
+  // More robust import button detection (id or button text)
+  function findImportButton(topBar) {
+    const byId = document.getElementById('importCsvStatsBtn') || document.getElementById('importCsvSeasonBtn');
+    if (byId) return byId;
+    if (!topBar) return null;
+    const candidates = Array.from(topBar.querySelectorAll('button'));
+    for (const b of candidates) {
+      const txt = (b.textContent || '').trim().toLowerCase();
+      if (/import\s*csv|import/i.test(txt)) return b;
+    }
+    return null;
+  }
+
+  function createButtonElement() {
     const btn = document.createElement('button');
-    btn.id = 'displayWakeLockBtn';
+    btn.id = BTN_ID;
     btn.className = 'top-btn';
     btn.style.minWidth = '160px';
     btn.style.fontWeight = '700';
-    // color requested by user: black
-    btn.style.background = '#000000';
+    btn.style.background = '#000000'; // user requested black
     btn.style.color = '#ffffff';
+    btn.style.margin = '0 6px';
+    btn.style.boxSizing = 'border-box';
     btn.title = 'Display dauerhaft anhalten (verhindert Standby). Klick zum Aktivieren/Deaktivieren.';
+    btn.setAttribute('aria-pressed', 'false');
 
-    function setText(on) {
-      // Label exactly as requested
-      btn.textContent = on ? 'Display always on' : 'Display always on';
-      // (Keep same label for both states — visual state is indicated via appearance)
-    }
+    // Label as requested
+    btn.textContent = 'Display always on';
 
     btn.addEventListener('click', async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
       const cur = localStorage.getItem(STORAGE_KEY) === '1';
-      if (!cur) {
-        // enabling requires user gesture -> call enable
-        await enableKeepScreenOn();
-      } else {
-        await disableKeepScreenOn();
+      try {
+        if (!cur) {
+          await enableKeepScreenOn();
+        } else {
+          await disableKeepScreenOn();
+        }
+      } catch (err) {
+        console.warn('Toggle action failed:', err);
       }
     });
 
-    // Insert button between Import and Reset:
-    // - If import button exists (id importCsvStatsBtn) place our button after it
-    // - Else, insert before Reset button (id resetBtn)
-    // - Else append to topBar end
-    const importBtn = document.getElementById('importCsvStatsBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    try {
-      if (importBtn && importBtn.parentNode === topBar) {
-        // insert after importBtn
-        if (importBtn.nextSibling) topBar.insertBefore(btn, importBtn.nextSibling);
-        else topBar.appendChild(btn);
-      } else if (resetBtn && resetBtn.parentNode === topBar) {
-        topBar.insertBefore(btn, resetBtn);
-      } else {
-        // fallback: append to end
-        topBar.appendChild(btn);
-      }
-    } catch (e) {
-      topBar.appendChild(btn);
-    }
-
-    // set initial visual state from localStorage
-    const initial = localStorage.getItem(STORAGE_KEY) === '1';
-    btn.dataset.on = initial ? '1' : '0';
-    // visual indicator: use border when ON
-    if (initial) {
-      btn.style.boxShadow = '0 0 0 2px rgba(255,255,255,0.08) inset';
-      btn.style.filter = 'brightness(1.06)';
-    } else {
-      btn.style.boxShadow = '';
-      btn.style.filter = '';
-    }
-
-    // expose setter used elsewhere
-    btn._setText = setText;
     return btn;
   }
 
+  // Insert button between Import and Reset per user's request, with fallbacks.
+  function insertButtonIntoTopBar() {
+    const topBar = findTopBar();
+    if (!topBar) {
+      log('topBar not found yet');
+      return false;
+    }
+    // avoid duplicate
+    if (document.getElementById(BTN_ID)) {
+      // ensure it's a child of topBar
+      const existing = document.getElementById(BTN_ID);
+      if (existing.parentNode !== topBar) topBar.appendChild(existing);
+      return true;
+    }
+
+    const btn = createButtonElement();
+    const importBtn = findImportButton(topBar);
+    const resetBtn = document.getElementById('resetBtn') || topBar.querySelector('.reset-btn');
+
+    try {
+      if (importBtn && importBtn.parentNode === topBar) {
+        // place after importBtn
+        if (importBtn.nextSibling) topBar.insertBefore(btn, importBtn.nextSibling);
+        else topBar.appendChild(btn);
+        log('Inserted Display button after Import button');
+      } else if (resetBtn && resetBtn.parentNode === topBar) {
+        // place immediately before Reset
+        topBar.insertBefore(btn, resetBtn);
+        log('Inserted Display button before Reset button');
+      } else {
+        // fallback: append at end
+        topBar.appendChild(btn);
+        log('Appended Display button at end of topBar');
+      }
+    } catch (e) {
+      try { topBar.appendChild(btn); } catch (ee) { console.warn('Failed to append button', ee); return false; }
+    }
+
+    // apply stored state visually
+    const initial = localStorage.getItem(STORAGE_KEY) === '1';
+    updateButtonState(initial);
+    return true;
+  }
+
   function updateButtonState(on) {
-    const btn = document.getElementById('displayWakeLockBtn') || createToggleButton();
+    const btn = document.getElementById(BTN_ID);
     if (!btn) return;
-    // Label remains "Display always on" per user request. Use visual cues for state.
-    btn._setText(Boolean(on));
     btn.dataset.on = on ? '1' : '0';
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     if (on) {
-      btn.style.boxShadow = '0 0 0 2px rgba(255,255,255,0.08) inset';
+      btn.style.boxShadow = 'inset 0 0 0 2px rgba(255,255,255,0.06)';
       btn.style.filter = 'brightness(1.06)';
-      btn.setAttribute('aria-pressed', 'true');
     } else {
       btn.style.boxShadow = '';
       btn.style.filter = '';
-      btn.setAttribute('aria-pressed', 'false');
     }
   }
 
-  // Initialize: add button and wire up events
-  function init() {
-    const btn = createToggleButton();
-    // If previously requested but not currently active, we can't auto-acquire without gesture.
-    // So we just reflect stored intent in the button appearance.
-    const wanted = localStorage.getItem(STORAGE_KEY) === '1';
-    updateButtonState(wanted);
-
-    // Visibility handling
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', async () => {
-      // Release lock on pagehide to be polite; it will be re-acquired on visible if requested and allowed.
-      try { await releaseWakeLockAPI(); } catch (e) {}
-    });
-
-    // On unload, release resources
-    window.addEventListener('beforeunload', async () => {
-      try { await releaseWakeLockAPI(); } catch (e) {}
-      disableNoSleep();
-    });
-
-    // Best-effort re-request if wanted and UA allows (cannot guarantee without user gesture)
-    if (wanted && document.visibilityState === 'visible') {
-      (async () => {
-        if ('wakeLock' in navigator) {
-          try { await requestWakeLockAPI(); updateButtonState(Boolean(wakeLock)); } catch (e) {}
+  // Waits for topBar to exist, then inserts. Observes DOM to re-run insertion if needed.
+  function ensureInsertedAndObserve() {
+    if (insertButtonIntoTopBar()) {
+      // already inserted
+      return;
+    }
+    // Observe document for the top-bar to be added
+    const mo = new MutationObserver((muts, observer) => {
+      for (const m of muts) {
+        if (m.type === 'childList') {
+          const tb = findTopBar();
+          if (tb) {
+            observer.disconnect();
+            // allow app.js to possibly add import button slightly after topBar shows
+            setTimeout(() => {
+              insertButtonIntoTopBar();
+              // now observe topBar children to react to dynamic import button creation
+              observeTopBarChildren();
+            }, 60);
+            break;
+          }
         }
-      })();
-    }
+      }
+    });
+    mo.observe(document.body || document.documentElement, { childList: true, subtree: true });
 
-    // If import button is added later (app.js creates it dynamically), ensure our position is updated
-    const topBar = document.querySelector('#statsPage .top-bar');
-    if (topBar) {
-      const mo = new MutationObserver(() => {
-        // re-run creation/placement logic to ensure correct order
-        createToggleButton();
+    // also set short interval fallback
+    const intId = setInterval(() => {
+      if (insertButtonIntoTopBar()) {
+        clearInterval(intId);
+        observeTopBarChildren();
+      }
+    }, 400);
+    // give up after 10s
+    setTimeout(() => clearInterval(intId), 10000);
+  }
+
+  function observeTopBarChildren() {
+    const topBar = findTopBar();
+    if (!topBar) return;
+    const mo2 = new MutationObserver(() => {
+      // try to ensure placement and state when topBar children change
+      try {
+        insertButtonIntoTopBar();
         updateButtonState(localStorage.getItem(STORAGE_KEY) === '1');
+      } catch (e) { /* ignore */ }
+    });
+    mo2.observe(topBar, { childList: true, subtree: false });
+  }
+
+  function init() {
+    try {
+      ensureInsertedAndObserve();
+
+      // Visibility / unload handlers
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('pagehide', async () => {
+        try { await releaseWakeLockAPI(); } catch (e) {}
       });
-      mo.observe(topBar, { childList: true, subtree: false });
+      window.addEventListener('beforeunload', async () => {
+        try { await releaseWakeLockAPI(); } catch (e) {}
+        disableNoSleep();
+      });
+
+      // If previously wanted, show button visually (real acquisition still needs a gesture)
+      const wanted = localStorage.getItem(STORAGE_KEY) === '1';
+      // If button already present, reflect state
+      const btn = document.getElementById(BTN_ID);
+      if (btn) updateButtonState(wanted);
+
+      log('enhancements-wakelock initialized (waiting for topBar if needed). previouslyWanted=' + wanted);
+    } catch (e) {
+      console.error('enhancements-wakelock init failed:', e);
     }
   }
 
-  // Run when DOM ready
+  // start when DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
 
-  // expose helpers for debugging
+  // exports for debugging
   window._enableKeepScreenOn = enableKeepScreenOn;
   window._disableKeepScreenOn = disableKeepScreenOn;
 })();
