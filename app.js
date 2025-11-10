@@ -1123,7 +1123,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (domBoxRect && domNaturalW && domNaturalH) {
             const rendered = computeRenderedImageRect(imgEl);
             if (rendered) {
-              offsetX_dom = rendered.x - domBoxRect.left;
+              offsetX_dom = rendered.x - domBoxRect.left; 
               offsetY_dom = rendered.y - domBoxRect.top;
               renderedW_dom = rendered.width;
               renderedH_dom = rendered.height;
