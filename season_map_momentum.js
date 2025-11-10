@@ -172,10 +172,11 @@
     if (!root) return;
     hideTimeBox();
 
-    let container = root.querySelector('#seasonMapMomentumContainer');
+    // NOTE: we create an element with id seasonMapMomentum (app.js export looks for this id)
+    let container = root.querySelector('#seasonMapMomentum');
     if (!container) {
       container = document.createElement('div');
-      container.id = 'seasonMapMomentumContainer';
+      container.id = 'seasonMapMomentum';
       container.style.marginTop = '12px';
       container.style.padding = '8px 12px';
       container.style.boxSizing = 'border-box';
@@ -237,15 +238,13 @@
       tick.setAttribute('y1', topY); tick.setAttribute('y2', botY);
       tick.setAttribute('stroke', '#cccccc'); tick.setAttribute('stroke-width', isMajor ? '1.6' : '1.0');
       svg.appendChild(tick);
-      // numeric label placed UNDER the white line (so the number appears below the line)
       const txt = document.createElementNS(svgNS,'text');
       txt.setAttribute('x', x);
-      // y = TOP_GUIDE_Y + offset -> placed under the white line; increase offset for major ticks a bit to avoid overlap
       txt.setAttribute('y', TOP_GUIDE_Y + (isMajor ? 22 : 14));
       txt.setAttribute('text-anchor', 'middle');
       txt.setAttribute('font-family', 'Segoe UI, Roboto, Arial');
       txt.setAttribute('font-size', isMajor ? '13' : '11');
-      txt.setAttribute('fill', '#ffffff'); // white numbers
+      txt.setAttribute('fill', '#ffffff');
       txt.setAttribute('font-weight', isMajor ? '800' : '700');
       txt.textContent = String(t);
       svg.appendChild(txt);
