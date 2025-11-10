@@ -136,12 +136,10 @@
     }
   }
 
-  // Utility: prefer top-bar insertion but keep trying until it exists
   function findTopBar() {
     return document.querySelector('#statsPage .top-bar') || document.querySelector('.top-bar');
   }
 
-  // More robust import button detection (id or button text)
   function findImportButton(topBar) {
     const byId = document.getElementById('importCsvStatsBtn') || document.getElementById('importCsvSeasonBtn');
     if (byId) return byId;
@@ -160,16 +158,13 @@
     btn.className = 'top-btn';
     btn.style.minWidth = '160px';
     btn.style.fontWeight = '700';
-    btn.style.background = '#000000'; // user requested black
+    btn.style.background = '#000000';
     btn.style.color = '#ffffff';
     btn.style.margin = '0 6px';
     btn.style.boxSizing = 'border-box';
     btn.title = 'Display dauerhaft anhalten (verhindert Standby). Klick zum Aktivieren/Deaktivieren.';
     btn.setAttribute('aria-pressed', 'false');
-
-    // Label as requested
     btn.textContent = 'Display always on';
-
     btn.addEventListener('click', async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -184,20 +179,16 @@
         console.warn('Toggle action failed:', err);
       }
     });
-
     return btn;
   }
 
-  // Insert button between Import and Reset per user's request, with fallbacks.
   function insertButtonIntoTopBar() {
     const topBar = findTopBar();
     if (!topBar) {
       log('topBar not found yet');
       return false;
     }
-    // avoid duplicate
     if (document.getElementById(BTN_ID)) {
-      // ensure it's a child of topBar
       const existing = document.getElementById(BTN_ID);
       if (existing.parentNode !== topBar) topBar.appendChild(existing);
       return true;
@@ -209,16 +200,13 @@
 
     try {
       if (importBtn && importBtn.parentNode === topBar) {
-        // place after importBtn
         if (importBtn.nextSibling) topBar.insertBefore(btn, importBtn.nextSibling);
         else topBar.appendChild(btn);
         log('Inserted Display button after Import button');
       } else if (resetBtn && resetBtn.parentNode === topBar) {
-        // place immediately before Reset
         topBar.insertBefore(btn, resetBtn);
         log('Inserted Display button before Reset button');
       } else {
-        // fallback: append at end
         topBar.appendChild(btn);
         log('Appended Display button at end of topBar');
       }
@@ -226,7 +214,6 @@
       try { topBar.appendChild(btn); } catch (ee) { console.warn('Failed to append button', ee); return false; }
     }
 
-    // apply stored state visually
     const initial = localStorage.getItem(STORAGE_KEY) === '1';
     updateButtonState(initial);
     return true;
@@ -246,23 +233,18 @@
     }
   }
 
-  // Waits for topBar to exist, then inserts. Observes DOM to re-run insertion if needed.
   function ensureInsertedAndObserve() {
     if (insertButtonIntoTopBar()) {
-      // already inserted
       return;
     }
-    // Observe document for the top-bar to be added
     const mo = new MutationObserver((muts, observer) => {
       for (const m of muts) {
         if (m.type === 'childList') {
           const tb = findTopBar();
           if (tb) {
             observer.disconnect();
-            // allow app.js to possibly add import button slightly after topBar shows
             setTimeout(() => {
               insertButtonIntoTopBar();
-              // now observe topBar children to react to dynamic import button creation
               observeTopBarChildren();
             }, 60);
             break;
@@ -272,14 +254,12 @@
     });
     mo.observe(document.body || document.documentElement, { childList: true, subtree: true });
 
-    // also set short interval fallback
     const intId = setInterval(() => {
       if (insertButtonIntoTopBar()) {
         clearInterval(intId);
         observeTopBarChildren();
       }
     }, 400);
-    // give up after 10s
     setTimeout(() => clearInterval(intId), 10000);
   }
 
@@ -287,7 +267,6 @@
     const topBar = findTopBar();
     if (!topBar) return;
     const mo2 = new MutationObserver(() => {
-      // try to ensure placement and state when topBar children change
       try {
         insertButtonIntoTopBar();
         updateButtonState(localStorage.getItem(STORAGE_KEY) === '1');
@@ -299,8 +278,6 @@
   function init() {
     try {
       ensureInsertedAndObserve();
-
-      // Visibility / unload handlers
       document.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('pagehide', async () => {
         try { await releaseWakeLockAPI(); } catch (e) {}
@@ -310,9 +287,7 @@
         disableNoSleep();
       });
 
-      // If previously wanted, show button visually (real acquisition still needs a gesture)
       const wanted = localStorage.getItem(STORAGE_KEY) === '1';
-      // If button already present, reflect state
       const btn = document.getElementById(BTN_ID);
       if (btn) updateButtonState(wanted);
 
@@ -322,14 +297,12 @@
     }
   }
 
-  // start when DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
 
-  // exports for debugging
   window._enableKeepScreenOn = enableKeepScreenOn;
   window._disableKeepScreenOn = disableKeepScreenOn;
 })();
