@@ -170,12 +170,15 @@ h1 {
 /* =========================================
    TOP BAR / BUTTONS
    ========================================= */
+/* Anpassung: alle Buttons in einer Reihe, bei Platzmangel horizontal scrollbar */
 .top-bar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;          /* keine Umbrüche: alle Buttons in einer Reihe */
   gap: 8px;
-  justify-content: center;
+  justify-content: flex-start; /* linksbündig; Buttons nebeneinander */
   padding: 8px 0;
+  overflow-x: auto;           /* bei Platzmangel horizontal scrollen */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Base top button styling - uniform height; not bold (except reset) */
@@ -194,6 +197,7 @@ h1 {
   justify-content: center;
   font-weight: 400;
   box-sizing: border-box;
+  flex: 0 0 auto;
 }
 .top-btn:hover { background: #3b3b3b; }
 
