@@ -30,6 +30,12 @@
         <button id="seasonBtn" class="top-btn season-highlight">Season</button>
         <button id="seasonMapBtn" class="top-btn season-highlight">Season Map</button>
         <button id="exportBtn" class="top-btn export-csv">Export CSV</button>
+
+        <!-- Display always on button (user requested: black color, placed before Reset) -->
+        <button id="displayWakeLockBtn" class="top-btn" style="background:#000000;color:#ffffff;min-width:160px;font-weight:700;margin:0 6px;">
+          Display always on
+        </button>
+
         <button id="resetBtn" class="top-btn danger-btn reset-btn">Reset</button>
       </div>
     </div>
@@ -229,5 +235,11 @@
 
   <script src="app.js"></script>
   <script src="season_map_momentum.js"></script>
+
+  <!-- html2canvas for capturing momentum area (used by export) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <!-- enhancements: wakelock / NoSleep fallback (uses the existing #displayWakeLockBtn) -->
+  <script src="enhancements-wakelock.js"></script>
 </body>
 </html>
