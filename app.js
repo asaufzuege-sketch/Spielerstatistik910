@@ -1021,7 +1021,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // --- UPDATED: exportSeasonMapPagePDF with momentum-graphic capture (html2canvas preferred, fallbacks) ---
+  // --- UPDATED: exportSeasonMapPagePDF with stricter momentum placement + clamp to avoid bottom clipping ---
   async function exportSeasonMapPagePDF() {
     try {
       const CANVAS_W = 2480;
@@ -1038,11 +1038,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const usableW = CANVAS_W - 2 * MARGIN;
       const usableH = CANVAS_H - 2 * MARGIN;
+
+      // Increase momentum area if needed; adjust as preferred (0.20 - 0.30 are reasonable)
+      const momentumAreaRatio = 0.25;
+      const momentumAreaH = Math.max(80, Math.round(usableH * momentumAreaRatio));
+      const mapAreaH = usableH - momentumAreaH;
+
+      // Layout: left field column + right goal column
       const fieldColW = Math.round(usableW * 0.65);
       const goalColW = usableW - fieldColW - Math.round(MARGIN * 0.5);
 
-      const fieldRect = { x: MARGIN, y: MARGIN, w: fieldColW, h: usableH };
-      const goalRect = { x: MARGIN + fieldColW + Math.round(MARGIN * 0.5), y: MARGIN, w: goalColW, h: usableH };
+      const fieldRect = { x: MARGIN, y: MARGIN, w: fieldColW, h: mapAreaH };
+      const goalRect = { x: MARGIN + fieldColW + Math.round(MARGIN * 0.5), y: MARGIN, w: goalColW, h: mapAreaH };
 
       const goalBoxes = [];
       const goalBoxCount = 3;
@@ -1186,32 +1193,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await Promise.all(drawTasks);
 
-      // ---- NEW: try to render the momentum graphic as image (html2canvas preferred, canvas/img/svg/foreignObject fallback) ----
+      // Momentum area: compute exact Y and available height inside canvas
       const momentumEl = document.querySelector('#momentumTable, .momentum-table, #seasonMapMomentum, .season-map-momentum');
-      const labelX = MARGIN;
-      let labelY = CANVAS_H - MARGIN - 140;
-      ctx.fillStyle = '#000';
-      ctx.font = '16px Arial';
+      const momentumX = MARGIN;
+      const momentumY = MARGIN + mapAreaH + 8; // guaranteed to be inside canvas
+      const maxMomentumW = usableW;
+      const maxMomentumH = Math.max(40, momentumAreaH - 12);
 
       async function captureElementWithHtml2Canvas(el) {
         if (!window.html2canvas) return null;
         try {
-          // ensure element visible and has size
           const orig = { display: el.style.display || '', visibility: el.style.visibility || '', position: el.style.position || '' };
           const needsTempUnhide = (getComputedStyle(el).display === 'none');
-          if (needsTempUnhide) {
-            el.style.display = 'block';
-            el.style.visibility = 'visible';
-            el.style.position = 'relative';
-          }
-
+          if (needsTempUnhide) { el.style.display = 'block'; el.style.visibility = 'visible'; el.style.position = 'relative'; }
           const canvasCaptured = await window.html2canvas(el, { backgroundColor: null, useCORS: true, scale: 2 });
-
-          if (needsTempUnhide) {
-            el.style.display = orig.display;
-            el.style.visibility = orig.visibility;
-            el.style.position = orig.position;
-          }
+          if (needsTempUnhide) { el.style.display = orig.display; el.style.visibility = orig.visibility; el.style.position = orig.position; }
           return canvasCaptured;
         } catch (err) {
           console.warn('html2canvas capture failed:', err);
@@ -1220,127 +1216,137 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (momentumEl) {
+        let drawn = false;
         try {
-          // try html2canvas first (most robust)
           let mCanvas = null;
           try { mCanvas = await captureElementWithHtml2Canvas(momentumEl); } catch (e) { mCanvas = null; }
 
           if (mCanvas && mCanvas.width > 0 && mCanvas.height > 0) {
-            const maxW = usableW;
-            const maxH = Math.round(usableH * 0.18);
-            const aspect = (mCanvas.width && mCanvas.height) ? (mCanvas.width / mCanvas.height) : (maxW / maxH);
-            let drawW = Math.min(maxW, mCanvas.width);
-            let drawH = drawW / aspect;
-            if (drawH > maxH) { drawH = maxH; drawW = Math.round(drawH * aspect); }
-            ctx.drawImage(mCanvas, labelX, labelY, drawW, drawH);
-            labelY += drawH + 10;
-          } else {
-            // fallback to finding inner canvas/img/svg
-            let drawn = false;
-            try {
-              const innerCanvas = momentumEl.querySelector('canvas');
-              if (innerCanvas) {
-                ctx.drawImage(innerCanvas, labelX, labelY, Math.min(usableW, innerCanvas.width), Math.round(innerCanvas.height * (Math.min(usableW, innerCanvas.width) / innerCanvas.width)));
-                drawn = true;
-              } else {
-                const innerImg = momentumEl.querySelector('img');
-                if (innerImg && innerImg.src) {
-                  const img = new Image();
-                  img.crossOrigin = 'anonymous';
-                  await new Promise(r => { img.onload = r; img.onerror = r; img.src = innerImg.src; });
-                  const maxW = usableW;
-                  const maxH = Math.round(usableH * 0.18);
-                  const aspect = (img.width && img.height) ? (img.width / img.height) : (maxW / maxH);
-                  let drawW = Math.min(maxW, img.width || maxW);
-                  let drawH = drawW / aspect;
-                  if (drawH > maxH) { drawH = maxH; drawW = Math.round(drawH * aspect); }
-                  ctx.drawImage(img, labelX, labelY, drawW, drawH);
-                  labelY += drawH + 10;
-                  drawn = true;
-                } else {
-                  const svgEl = momentumEl.querySelector('svg');
-                  if (svgEl) {
-                    const xml = new XMLSerializer().serializeToString(svgEl);
-                    const svg64 = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
-                    const img = new Image();
-                    img.crossOrigin = 'anonymous';
-                    await new Promise(r => { img.onload = r; img.onerror = r; img.src = svg64; });
-                    const maxW = usableW;
-                    const maxH = Math.round(usableH * 0.18);
-                    const aspect = (img.width && img.height) ? (img.width / img.height) : (maxW / maxH);
-                    let drawW = Math.min(maxW, img.width || maxW);
-                    let drawH = drawW / aspect;
-                    if (drawH > maxH) { drawH = maxH; drawW = Math.round(drawH * aspect); }
-                    ctx.drawImage(img, labelX, labelY, drawW, drawH);
-                    labelY += drawH + 10;
-                    drawn = true;
-                  }
-                }
+            // fit captured momentum canvas into reserved area and clamp to canvas bottom
+            const aspect = mCanvas.width / mCanvas.height;
+            let drawW = Math.min(maxMomentumW, mCanvas.width);
+            let drawH = Math.round(drawW / aspect);
+            if (drawH > maxMomentumH) { drawH = maxMomentumH; drawW = Math.round(drawH * aspect); }
+
+            // center inside reserved area
+            let offX = momentumX + Math.round((maxMomentumW - drawW) / 2);
+            let offY = momentumY + Math.round((maxMomentumH - drawH) / 2);
+
+            // Safety clamp: ensure we don't draw beyond canvas bottom
+            const maxAllowedBottom = CANVAS_H - MARGIN;
+            if (offY + drawH > maxAllowedBottom) {
+              const availableH = Math.max(8, maxAllowedBottom - offY);
+              if (availableH < drawH) {
+                drawH = availableH;
+                drawW = Math.max(1, Math.round(drawH * aspect));
+                offX = momentumX + Math.round((maxMomentumW - drawW) / 2);
               }
-            } catch (e) {
-              console.warn('fallback momentum draw failed:', e);
-              drawn = false;
             }
 
-            if (!drawn) {
-              // last fallback: render table/text as before
-              const rows = Array.from(momentumEl.querySelectorAll('tr'));
-              if (rows.length) {
-                ctx.fillText('Momentum:', labelX, labelY);
-                labelY += 20;
-                ctx.font = '13px Arial';
-                rows.slice(0, 12).forEach((tr) => {
-                  const texts = Array.from(tr.querySelectorAll('th,td')).map(td => td.textContent.trim());
-                  const line = texts.join('  ');
-                  ctx.fillText(line, labelX, labelY);
-                  labelY += 16;
-                });
-              } else {
-                ctx.fillText('Momentum (keine Grafik gefunden)', labelX, labelY);
-                labelY += 18;
-                ctx.font = '14px Arial';
-                const periods = Object.keys(timeData || {});
-                if (!periods.length) {
-                  ctx.fillText('(keine Time-Data)', labelX, labelY);
-                } else {
-                  periods.forEach(k => {
-                    ctx.fillText(`${k}: ${JSON.stringify(timeData[k])}`, labelX, labelY);
-                    labelY += 14;
-                  });
-                }
+            ctx.drawImage(mCanvas, offX, offY, drawW, drawH);
+            drawn = true;
+          } else {
+            // fallback paths: inner canvas / img / svg (all also clamped)
+            const innerCanvas = momentumEl.querySelector('canvas');
+            const innerImg = momentumEl.querySelector('img');
+            const svgEl = momentumEl.querySelector('svg');
+
+            let sourceImg = null;
+            let sourceW = 0, sourceH = 0;
+
+            if (innerCanvas) {
+              sourceImg = innerCanvas;
+              sourceW = innerCanvas.width;
+              sourceH = innerCanvas.height;
+            } else if (innerImg && innerImg.src) {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              await new Promise(r => { img.onload = r; img.onerror = r; img.src = innerImg.src; });
+              sourceImg = img;
+              sourceW = img.width || maxMomentumW;
+              sourceH = img.height || maxMomentumH;
+            } else if (svgEl) {
+              const xml = new XMLSerializer().serializeToString(svgEl);
+              const svg64 = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              await new Promise(r => { img.onload = r; img.onerror = r; img.src = svg64; });
+              sourceImg = img;
+              sourceW = img.width || maxMomentumW;
+              sourceH = img.height || maxMomentumH;
+            }
+
+            if (sourceImg) {
+              const aspect = (sourceW && sourceH) ? (sourceW / sourceH) : (maxMomentumW / maxMomentumH);
+              let drawW = Math.min(maxMomentumW, sourceW || maxMomentumW);
+              let drawH = Math.round(drawW / aspect);
+              if (drawH > maxMomentumH) { drawH = maxMomentumH; drawW = Math.round(drawH * aspect); }
+              let offX = momentumX + Math.round((maxMomentumW - drawW) / 2);
+              let offY = momentumY + Math.round((maxMomentumH - drawH) / 2);
+              const maxAllowedBottom = CANVAS_H - MARGIN;
+              if (offY + drawH > maxAllowedBottom) {
+                const availableH = Math.max(8, maxAllowedBottom - offY);
+                drawH = availableH;
+                drawW = Math.max(1, Math.round(drawH * aspect));
+                offX = momentumX + Math.round((maxMomentumW - drawW) / 2);
               }
+              ctx.drawImage(sourceImg, offX, offY, drawW, drawH);
+              drawn = true;
             }
           }
-        } catch (e) {
-          ctx.fillText('Momentum (konnte nicht als Bild exportiert werden):', labelX, labelY);
-          labelY += 18;
-          ctx.font = '14px Arial';
-          const periods = Object.keys(timeData || {});
-          if (!periods.length) {
-            ctx.fillText('(keine Time-Data)', labelX, labelY);
-          } else {
-            periods.forEach(k => {
-              ctx.fillText(`${k}: ${JSON.stringify(timeData[k])}`, labelX, labelY);
-              labelY += 14;
+
+          if (!drawn) {
+            // final fallback: draw textual representation of timeData inside reserved area
+            ctx.fillStyle = '#000';
+            ctx.font = '14px Arial';
+            ctx.fillText('Momentum / Info:', momentumX, momentumY + 14);
+            ctx.font = '12px Arial';
+            let ty = momentumY + 32;
+            const rows = [];
+            try {
+              const trNodes = Array.from(momentumEl.querySelectorAll('tr'));
+              trNodes.slice(0, 8).forEach(tr => rows.push(Array.from(tr.querySelectorAll('th,td')).map(td => td.textContent.trim()).join('  ')));
+            } catch (e) { /* ignore */ }
+            if (!rows.length) {
+              const periods = Object.keys(timeData || {});
+              if (periods.length) {
+                rows.push('TimeData:');
+                periods.forEach(k => rows.push(`${k}: ${JSON.stringify(timeData[k])}`));
+              } else {
+                rows.push('(keine Momentum-Grafik gefunden)');
+              }
+            }
+            rows.forEach(r => {
+              if (ty + 14 > CANVAS_H - MARGIN) return; // prevent overflow
+              ctx.fillText(r, momentumX, ty);
+              ty += 14;
             });
           }
+        } catch (err) {
+          console.warn('Momentum drawing failed:', err);
+          ctx.fillStyle = '#000';
+          ctx.font = '14px Arial';
+          ctx.fillText('Momentum: (konnte nicht gerendert werden)', momentumX, momentumY + 14);
         }
       } else {
-        // no momentum element present -> fallback: render timeData as before
-        ctx.fillText('Time Tracking (Season Map):', labelX, labelY);
-        labelY += 22;
+        // no momentum element -> list timeData
+        ctx.fillStyle = '#000';
+        ctx.font = '14px Arial';
+        ctx.fillText('Time Tracking (Season Map):', momentumX, momentumY + 14);
+        let ty = momentumY + 32;
         const periods = Object.keys(timeData || {});
         if (!periods.length) {
-          ctx.fillText('(keine Time-Data)', labelX, labelY);
+          ctx.fillText('(keine Time-Data)', momentumX, ty);
         } else {
-          ctx.font = '14px Arial';
           periods.forEach(k => {
-            ctx.fillText(`${k}: ${JSON.stringify(timeData[k])}`, labelX, labelY);
-            labelY += 18;
+            if (ty + 14 > CANVAS_H - MARGIN) return;
+            ctx.fillText(`${k}: ${JSON.stringify(timeData[k])}`, momentumX, ty);
+            ty += 14;
           });
         }
       }
 
+      // export to PNG then PDF
       const imgData = canvas.toDataURL('image/png');
 
       let jsPDFCtor = null;
@@ -1349,29 +1355,31 @@ document.addEventListener("DOMContentLoaded", () => {
       else if (window.jsPDF) jsPDFCtor = window.jsPDF;
       else if (window.jspdf) jsPDFCtor = window.jspdf;
       if (!jsPDFCtor) {
-        alert('jsPDF wurde nicht gefunden. PDF-Export nicht möglich. Führe stattdessen den PNG-Export aus.');
-        const a = document.createElement('a');
-        a.href = imgData;
-        a.download = 'season_map_a4.png';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        alert('jsPDF nicht gefunden — PNG-Export wird erzeugt.');
+        const a = document.createElement('a'); a.href = imgData; a.download = 'season_map.png'; document.body.appendChild(a); a.click(); a.remove();
         return;
       }
 
       const pdf = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'portrait' });
       const pageWidthMm = 210;
       const pageHeightMm = 297;
-      const marginMm = 10; // 10 mm margins
-      const drawWidthMm = pageWidthMm - 2 * marginMm;
+      const marginMm = 10;
+
+      // compute fitting size preserving aspect ratio
+      const drawWidthMmMax = pageWidthMm - 2 * marginMm;
       const canvasAspect = canvas.height / canvas.width;
+      let drawWidthMm = drawWidthMmMax;
       let drawHeightMm = drawWidthMm * canvasAspect;
-      let finalDrawWidthMm = drawWidthMm;
-      let finalDrawHeightMm = drawHeightMm;
-      if (finalDrawHeightMm > pageHeightMm - 2 * marginMm) {
-        finalDrawHeightMm = pageHeightMm - 2 * marginMm;
-        finalDrawWidthMm = finalDrawHeightMm / canvasAspect;
+      if (drawHeightMm > (pageHeightMm - 2 * marginMm)) {
+        drawHeightMm = pageHeightMm - 2 * marginMm;
+        drawWidthMm = drawHeightMm / canvasAspect;
       }
+
+      // IMPORTANT: zoomFactor controls final scale on PDF; keep ≤1 so content fits
+      const zoomFactor = 0.5;
+      const finalDrawWidthMm = drawWidthMm * zoomFactor;
+      const finalDrawHeightMm = drawHeightMm * zoomFactor;
+
       const xMm = (pageWidthMm - finalDrawWidthMm) / 2;
       const yMm = (pageHeightMm - finalDrawHeightMm) / 2;
 
