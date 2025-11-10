@@ -1021,7 +1021,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // --- UPDATED: exportSeasonMapPagePDF with stricter momentum placement + clamp to avoid bottom clipping ---
+  // --- UPDATED: exportSeasonMapPagePDF with stricter momentum placement + ticks labels + zoom 0.75 ---
   async function exportSeasonMapPagePDF() {
     try {
       const CANVAS_W = 2480;
@@ -1215,8 +1215,36 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
+      // helper to estimate total minutes from stored timeData
+      function estimateTotalMinutesFromTimeData(td) {
+        try {
+          if (!td || typeof td !== 'object') return 60;
+          let sum = 0;
+          let anyLarge = false;
+          Object.keys(td).forEach(k => {
+            const arr = td[k] || [];
+            arr.forEach(v => {
+              const n = Number(v) || 0;
+              if (n >= 60) anyLarge = true;
+              sum += n;
+            });
+          });
+          if (sum <= 0) return 60;
+          if (anyLarge) {
+            // sum likely in seconds
+            return Math.ceil(sum / 60);
+          } else {
+            // sum likely already minutes/segments — assume each unit is 1 minute; if you use 5min steps, user data might reflect that
+            return Math.ceil(sum);
+          }
+        } catch (e) {
+          return 60;
+        }
+      }
+
       if (momentumEl) {
         let drawn = false;
+        let finalMomentumArea = { x: momentumX, y: momentumY, w: maxMomentumW, h: maxMomentumH, drawnH: 0, drawnW: 0, offX: momentumX, offY: momentumY };
         try {
           let mCanvas = null;
           try { mCanvas = await captureElementWithHtml2Canvas(momentumEl); } catch (e) { mCanvas = null; }
@@ -1244,6 +1272,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             ctx.drawImage(mCanvas, offX, offY, drawW, drawH);
+            finalMomentumArea = { x: momentumX, y: momentumY, w: maxMomentumW, h: maxMomentumH, drawnH: drawH, drawnW: drawW, offX, offY };
             drawn = true;
           } else {
             // fallback paths: inner canvas / img / svg (all also clamped)
@@ -1291,42 +1320,55 @@ document.addEventListener("DOMContentLoaded", () => {
                 offX = momentumX + Math.round((maxMomentumW - drawW) / 2);
               }
               ctx.drawImage(sourceImg, offX, offY, drawW, drawH);
+              finalMomentumArea = { x: momentumX, y: momentumY, w: maxMomentumW, h: maxMomentumH, drawnH: drawH, drawnW: drawW, offX, offY };
               drawn = true;
             }
           }
 
-          if (!drawn) {
-            // final fallback: draw textual representation of timeData inside reserved area
-            ctx.fillStyle = '#000';
-            ctx.font = '14px Arial';
-            ctx.fillText('Momentum / Info:', momentumX, momentumY + 14);
-            ctx.font = '12px Arial';
-            let ty = momentumY + 32;
-            const rows = [];
-            try {
-              const trNodes = Array.from(momentumEl.querySelectorAll('tr'));
-              trNodes.slice(0, 8).forEach(tr => rows.push(Array.from(tr.querySelectorAll('th,td')).map(td => td.textContent.trim()).join('  ')));
-            } catch (e) { /* ignore */ }
-            if (!rows.length) {
-              const periods = Object.keys(timeData || {});
-              if (periods.length) {
-                rows.push('TimeData:');
-                periods.forEach(k => rows.push(`${k}: ${JSON.stringify(timeData[k])}`));
-              } else {
-                rows.push('(keine Momentum-Grafik gefunden)');
-              }
-            }
-            rows.forEach(r => {
-              if (ty + 14 > CANVAS_H - MARGIN) return; // prevent overflow
-              ctx.fillText(r, momentumX, ty);
-              ty += 14;
-            });
-          }
+          // If nothing drawn, textual fallback will be placed — set finalMomentumArea drawnH=0, but still keep area coords
         } catch (err) {
           console.warn('Momentum drawing failed:', err);
-          ctx.fillStyle = '#000';
-          ctx.font = '14px Arial';
-          ctx.fillText('Momentum: (konnte nicht gerendert werden)', momentumX, momentumY + 14);
+        }
+
+        // --- Draw time ticks (5min steps) under/over momentum area for readability ---
+        try {
+          const totalMinutes = estimateTotalMinutesFromTimeData(timeData);
+          const maxLabel = Math.max(10, Math.ceil(totalMinutes / 5) * 5);
+          const tickStep = 5; // 5 minute steps
+          const tickCount = Math.max(1, Math.floor(maxLabel / tickStep));
+          const axisX = finalMomentumArea.x;
+          const axisW = finalMomentumArea.w;
+          const axisY = finalMomentumArea.y + finalMomentumArea.h - 2; // bottom inside reserved area
+          ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+          ctx.fillStyle = 'rgba(0,0,0,0.75)';
+          ctx.lineWidth = 1;
+          ctx.font = '12px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+
+          // draw axis baseline
+          const baselineY = finalMomentumArea.y + finalMomentumArea.h - 4;
+          ctx.beginPath();
+          ctx.moveTo(axisX, baselineY);
+          ctx.lineTo(axisX + axisW, baselineY);
+          ctx.stroke();
+
+          for (let i = 0; i <= tickCount; i++) {
+            const minute = i * tickStep;
+            const frac = (tickCount === 0) ? 0 : (i / tickCount);
+            const x = Math.round(axisX + frac * axisW);
+            const tickH = 6;
+            // tick
+            ctx.beginPath();
+            ctx.moveTo(x, baselineY - tickH);
+            ctx.lineTo(x, baselineY + 2);
+            ctx.stroke();
+            // label
+            const label = `${minute}m`;
+            ctx.fillText(label, x, baselineY + 4);
+          }
+        } catch (e) {
+          // ignore ticks draw issues
         }
       } else {
         // no momentum element -> list timeData
@@ -1344,6 +1386,37 @@ document.addEventListener("DOMContentLoaded", () => {
             ty += 14;
           });
         }
+
+        // still draw ticks using estimated total minutes
+        try {
+          const totalMinutes = estimateTotalMinutesFromTimeData(timeData);
+          const maxLabel = Math.max(10, Math.ceil(totalMinutes / 5) * 5);
+          const tickStep = 5; // 5 minute steps
+          const tickCount = Math.max(1, Math.floor(maxLabel / tickStep));
+          const axisX = momentumX;
+          const axisW = maxMomentumW;
+          const baselineY = momentumY + maxMomentumH - 4;
+          ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+          ctx.fillStyle = 'rgba(0,0,0,0.75)';
+          ctx.lineWidth = 1;
+          ctx.font = '12px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.beginPath();
+          ctx.moveTo(axisX, baselineY);
+          ctx.lineTo(axisX + axisW, baselineY);
+          ctx.stroke();
+          for (let i = 0; i <= tickCount; i++) {
+            const minute = i * tickStep;
+            const frac = (tickCount === 0) ? 0 : (i / tickCount);
+            const x = Math.round(axisX + frac * axisW);
+            ctx.beginPath();
+            ctx.moveTo(x, baselineY - 6);
+            ctx.lineTo(x, baselineY + 2);
+            ctx.stroke();
+            ctx.fillText(`${minute}m`, x, baselineY + 4);
+          }
+        } catch (e) {}
       }
 
       // export to PNG then PDF
@@ -1375,8 +1448,8 @@ document.addEventListener("DOMContentLoaded", () => {
         drawWidthMm = drawHeightMm / canvasAspect;
       }
 
-      // IMPORTANT: zoomFactor controls final scale on PDF; keep ≤1 so content fits
-      const zoomFactor = 0.5;
+      // IMPORTANT: zoomFactor controls final scale on PDF; changed to 0.75 for ~50% larger than 0.5
+      const zoomFactor = 0.75;
       const finalDrawWidthMm = drawWidthMm * zoomFactor;
       const finalDrawHeightMm = drawHeightMm * zoomFactor;
 
@@ -1709,6 +1782,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const totalRow = new Array(header.length).fill("");
       totalRow[1] = `Total (${selectedPlayers.length})`;
+
+      // Shots column is header index 2 (Nr=0, Spieler=1, Shot=2)
+      const ownShots = totals["Shot"] || 0;
+      // try to read opponent shots from DOM total cell dataset; fallback to 0
+      const oppShots = Number(document.querySelector(".total-cell[data-cat='Shot']")?.dataset.opp || 0);
+      // set Shots cell to "own vs opp"
+      totalRow[2] = `${ownShots} vs ${oppShots}`;
+
       categories.forEach((c, idx) => {
         const colIndex = 2 + idx;
         if (c === "+/-") {
@@ -1719,10 +1800,13 @@ document.addEventListener("DOMContentLoaded", () => {
           const totalFace = totals["FaceOffs"] || 0;
           const percent = totalFace ? Math.round((totals["FaceOffs Won"]/totalFace)*100) : 0;
           totalRow[colIndex] = `${totals["FaceOffs Won"]} (${percent}%)`;
+        } else if (c === "Shot") {
+          // already set above as "own vs opp"
         } else {
           totalRow[colIndex] = String(totals[c] || 0);
         }
       });
+
       totalRow[header.length - 1] = formatTimeMMSS(totalSeconds);
       rows.push(totalRow);
 
@@ -2754,216 +2838,4 @@ document.addEventListener("DOMContentLoaded", () => {
             const nv = Number(all[name][idx] || 0);
             if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
             else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
-            else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
-
-            const valCell = valueCellMap[name];
-            if (valCell) {
-              const comp = computeValueForPlayer(name);
-              valCell.textContent = formatValueNumber(comp);
-              if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
-              else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
-              else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
-            }
-            lastTap = 0;
-          } else {
-            lastTap = now;
-            setTimeout(() => {
-              if (lastTap !== 0) {
-                const all = getGoalValueData();
-                if (!all[name]) all[name] = opponents.map(()=>0);
-                all[name][idx] = Math.max(0, (Number(all[name][idx]||0) + 1));
-                setGoalValueData(all);
-                td.textContent = String(all[name][idx]);
-                const nv = Number(all[name][idx] || 0);
-                if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
-                else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
-                else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
-
-                const valCell = valueCellMap[name];
-                if (valCell) { 
-                  const comp = computeValueForPlayer(name);
-                  valCell.textContent = formatValueNumber(comp);
-                  if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
-                  else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
-                  else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
-                }
-                lastTap = 0;
-              }
-            }, 300);
-          }
-        }, { passive: true });
-
-        row.appendChild(td);
-      });
-
-      const tdValue = document.createElement("td");
-      tdValue.style.padding = "6px";
-      tdValue.style.textAlign = "center";
-      const computed = computeValueForPlayer(name);
-      tdValue.textContent = formatValueNumber(computed);
-      if (computed > 0) { tdValue.style.color = posColorGlobal; tdValue.style.fontWeight = "700"; }
-      else if (computed < 0) { tdValue.style.color = negColorGlobal; tdValue.style.fontWeight = "400"; }
-      else { tdValue.style.color = zeroColorGlobal; tdValue.style.fontWeight = "400"; }
-      row.appendChild(tdValue);
-      valueCellMap[name] = tdValue;
-
-      tbody.appendChild(row);
-    });
-
-    const bottomRow = document.createElement("tr");
-    bottomRow.classList.add(playerNames.length % 2 === 0 ? "even-row" : "odd-row");
-    bottomRow.style.background = "rgba(0,0,0,0.03)";
-    const bottomLabel = document.createElement("td");
-    bottomLabel.style.padding = "6px";
-    bottomLabel.style.fontWeight = "700";
-    bottomLabel.style.textAlign = "center";
-    bottomLabel.textContent = "GegNER";
-    bottomRow.appendChild(bottomLabel);
-
-    const goalValueOptions = [];
-    for (let v=0; v<=10; v++) goalValueOptions.push((v*0.5).toFixed(1));
-
-    const bottomStored = getGoalValueBottom();
-    while (bottomStored.length < opponents.length) bottomStored.push(0);
-    if (bottomStored.length > opponents.length) bottomStored.length = opponents.length;
-    setGoalValueBottom(bottomStored);
-
-    opponents.forEach((op, idx) => {
-      const td = document.createElement("td");
-      td.style.padding = "6px";
-      td.style.textAlign = "center";
-      const sel = document.createElement("select");
-      sel.style.width = "80px";
-      goalValueOptions.forEach(opt => {
-        const o = document.createElement("option");
-        o.value = opt;
-        o.textContent = opt;
-        sel.appendChild(o);
-      });
-      const b = getGoalValueBottom();
-      if (b && typeof b[idx] !== "undefined") sel.value = String(b[idx]);
-      sel.addEventListener("change", () => {
-        const arr = getGoalValueBottom();
-        arr[idx] = Number(sel.value);
-        setGoalValueBottom(arr);
-        Object.keys(valueCellMap).forEach(playerName => {
-          const el = valueCellMap[playerName];
-          if (el) { 
-            const comp = computeValueForPlayer(playerName);
-            el.textContent = formatValueNumber(comp);
-            if (comp > 0) { el.style.color = posColorGlobal; el.style.fontWeight = "700"; }
-            else if (comp < 0) { el.style.color = negColorGlobal; el.style.fontWeight = "400"; }
-            else { el.style.color = zeroColorGlobal; el.style.fontWeight = "400"; }
-          }
-        });
-      });
-      td.appendChild(sel);
-      bottomRow.appendChild(td);
-    });
-
-    const tdEmptyForValue = document.createElement("td");
-    tdEmptyForValue.style.padding = "6px";
-    tdEmptyForValue.textContent = "";
-    bottomRow.appendChild(tdEmptyForValue);
-
-    tbody.appendChild(bottomRow);
-    table.appendChild(tbody);
-
-    // Wrap goalvalue table in scroll wrapper so all columns are accessible
-    const wrapper = document.createElement('div');
-    wrapper.className = 'table-scroll';
-    wrapper.style.width = '100%';
-    wrapper.style.boxSizing = 'border-box';
-    wrapper.appendChild(table);
-
-    goalValueContainer.appendChild(wrapper);
-  }
-
-  function resetGoalValuePage() {
-    if (!confirm("⚠️ Goal Value zurücksetzen? Alle Spielerwerte auf 0 und Skalen auf 0 setzen.")) return;
-    const opponents = getGoalValueOpponents();
-    const playerNames = Object.keys(seasonData).length ? Object.keys(seasonData) : selectedPlayers.map(p=>p.name);
-    const newData = {};
-    playerNames.forEach(n => newData[n] = opponents.map(()=>0));
-    setGoalValueData(newData);
-    setGoalValueBottom(opponents.map(()=>0));
-    renderGoalValuePage();
-    alert("Goal Value zurückgezet.");
-  }
-
-  // --- Final init and restore state on load ---
-  seasonData = JSON.parse(localStorage.getItem("seasonData")) || seasonData || {};
-
-  renderPlayerSelection();
-
-  const lastPage = localStorage.getItem("currentPage") || (selectedPlayers.length ? "stats" : "selection");
-  if (lastPage === "stats") {
-    showPageRef("stats");
-    renderStatsTable();
-    updateIceTimeColors();
-  } else if (lastPage === "season") {
-    showPageRef("season");
-    renderSeasonTable();
-  } else if (lastPage === "seasonMap") {
-    showPageRef("seasonMap");
-    renderSeasonMapPage();
-  } else if (lastPage === "goalValue") {
-    showPageRef("goalValue");
-    renderGoalValuePage();
-  } else {
-    showPageRef("selection");
-  }
-
-  updateTimerDisplay();
-
-  // Save to localStorage on unload
-  window.addEventListener("beforeunload", () => {
-    try {
-      localStorage.setItem("statsData", JSON.stringify(statsData));
-      localStorage.setItem("selectedPlayers", JSON.stringify(selectedPlayers));
-      localStorage.setItem("playerTimes", JSON.stringify(playerTimes));
-      localStorage.setItem("timerSeconds", String(timerSeconds));
-      localStorage.setItem("seasonData", JSON.stringify(seasonData));
-      localStorage.setItem("goalValueOpponents", JSON.stringify(getGoalValueOpponents()));
-      localStorage.setItem("goalValueData", JSON.stringify(getGoalValueData()));
-      localStorage.setItem("goalValueBottom", JSON.stringify(getGoalValueBottom()));
-    } catch (e) {
-      // ignore
-    }
-  });
-
-  // Robust: zentrale Delegation für alle Back-Buttons (registriert sofort)
-  document.addEventListener('click', function (e) {
-    try {
-      const btn = e.target.closest && e.target.closest('button');
-      if (!btn) return;
-      const id = btn.id || '';
-
-      const backButtonIds = new Set([
-        'backToStatsBtn',
-        'backToStatsFromSeasonBtn',
-        'backToStatsFromSeasonMapBtn',
-        'backFromGoalValueBtn'
-      ]);
-
-      if (backButtonIds.has(id)) {
-        if (typeof window.showPage === 'function') {
-          window.showPage('stats');
-        } else if (typeof showPageRef === 'function') {
-          showPageRef('stats');
-        } else if (typeof showPage === 'function') {
-          showPage('stats');
-        } else {
-          document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-          const statsP = document.getElementById('statsPage');
-          if (statsP) statsP.style.display = 'block';
-        }
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    } catch (err) {
-      console.warn('Back button delegation failed:', err);
-    }
-  }, true);
-
-});
+            else { td
