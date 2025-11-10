@@ -1,10 +1,12 @@
 // enhancements-wakelock.js
-// Adds a "Display ON/OFF" toggle to keep the screen awake.
+// Adds a "Display always on" toggle to keep the screen awake.
 // - Uses Screen Wake Lock API if available
 // - Falls back to NoSleep.js (loaded from CDN) if Wake Lock not supported
 // - Persists requested state in localStorage ('keepScreenOn')
 // - Re-acquires wake lock on visibilitychange / page show when appropriate
 // - Releases on toggle off / unload
+//
+// NOTE: place <script src="enhancements-wakelock.js"></script> after app.js in index.html
 (function () {
   const STORAGE_KEY = 'keepScreenOn';
   const NO_SLEEP_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/no-sleep/0.12.0/NoSleep.min.js';
@@ -57,7 +59,7 @@
       s.onload = () => {
         resolve(window.NoSleep);
       };
-      s.onerror = (e) => reject(e);
+      s.onerror = () => reject(new Error('NoSleep load failed'));
       document.head.appendChild(s);
     });
   }
@@ -156,14 +158,17 @@
     const btn = document.createElement('button');
     btn.id = 'displayWakeLockBtn';
     btn.className = 'top-btn';
-    btn.style.minWidth = '140px';
+    btn.style.minWidth = '160px';
     btn.style.fontWeight = '700';
-    btn.style.background = '#304ffe';
-    btn.style.color = '#fff';
+    // color requested by user: black
+    btn.style.background = '#000000';
+    btn.style.color = '#ffffff';
     btn.title = 'Display dauerhaft anhalten (verhindert Standby). Klick zum Aktivieren/Deaktivieren.';
 
     function setText(on) {
-      btn.textContent = on ? 'Display ON' : 'Display OFF';
+      // Label exactly as requested
+      btn.textContent = on ? 'Display always on' : 'Display always on';
+      // (Keep same label for both states — visual state is indicated via appearance)
     }
 
     btn.addEventListener('click', async (ev) => {
@@ -178,11 +183,38 @@
       }
     });
 
-    topBar.appendChild(btn);
-    // set initial visual state from localStorage (note: actual lock must be re-requested by user gesture)
+    // Insert button between Import and Reset:
+    // - If import button exists (id importCsvStatsBtn) place our button after it
+    // - Else, insert before Reset button (id resetBtn)
+    // - Else append to topBar end
+    const importBtn = document.getElementById('importCsvStatsBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    try {
+      if (importBtn && importBtn.parentNode === topBar) {
+        // insert after importBtn
+        if (importBtn.nextSibling) topBar.insertBefore(btn, importBtn.nextSibling);
+        else topBar.appendChild(btn);
+      } else if (resetBtn && resetBtn.parentNode === topBar) {
+        topBar.insertBefore(btn, resetBtn);
+      } else {
+        // fallback: append to end
+        topBar.appendChild(btn);
+      }
+    } catch (e) {
+      topBar.appendChild(btn);
+    }
+
+    // set initial visual state from localStorage
     const initial = localStorage.getItem(STORAGE_KEY) === '1';
-    setText(initial);
     btn.dataset.on = initial ? '1' : '0';
+    // visual indicator: use border when ON
+    if (initial) {
+      btn.style.boxShadow = '0 0 0 2px rgba(255,255,255,0.08) inset';
+      btn.style.filter = 'brightness(1.06)';
+    } else {
+      btn.style.boxShadow = '';
+      btn.style.filter = '';
+    }
 
     // expose setter used elsewhere
     btn._setText = setText;
@@ -192,25 +224,32 @@
   function updateButtonState(on) {
     const btn = document.getElementById('displayWakeLockBtn') || createToggleButton();
     if (!btn) return;
+    // Label remains "Display always on" per user request. Use visual cues for state.
     btn._setText(Boolean(on));
     btn.dataset.on = on ? '1' : '0';
-    btn.style.filter = on ? 'brightness(1.06)' : '';
+    if (on) {
+      btn.style.boxShadow = '0 0 0 2px rgba(255,255,255,0.08) inset';
+      btn.style.filter = 'brightness(1.06)';
+      btn.setAttribute('aria-pressed', 'true');
+    } else {
+      btn.style.boxShadow = '';
+      btn.style.filter = '';
+      btn.setAttribute('aria-pressed', 'false');
+    }
   }
 
   // Initialize: add button and wire up events
   function init() {
     const btn = createToggleButton();
     // If previously requested but not currently active, we can't auto-acquire without gesture.
-    // So we just reflect stored intent in the button label.
+    // So we just reflect stored intent in the button appearance.
     const wanted = localStorage.getItem(STORAGE_KEY) === '1';
     updateButtonState(wanted);
 
     // Visibility handling
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('pagehide', async () => {
-      // On mobile, optionally keep the lock? we release to be polite
-      // but if you want to persist across pages, comment this out.
-      // We'll release to avoid leaks.
+      // Release lock on pagehide to be polite; it will be re-acquired on visible if requested and allowed.
       try { await releaseWakeLockAPI(); } catch (e) {}
     });
 
@@ -220,17 +259,24 @@
       disableNoSleep();
     });
 
-    // If the user stored ON and OS supports wakeLock API AND page is visible,
-    // we can't automatically re-acquire without a user gesture — but for modern browsers,
-    // a subsequent user interaction (clicking the button) will enable it.
-    // We still attempt to request if the UA allows (some UAs allow re-request on page show).
+    // Best-effort re-request if wanted and UA allows (cannot guarantee without user gesture)
     if (wanted && document.visibilityState === 'visible') {
-      // best-effort (may fail if no user gesture)
       (async () => {
         if ('wakeLock' in navigator) {
-          try { await requestWakeLockAPI(); updateButtonState(Boolean(wakeLock)); } catch(e){ }
+          try { await requestWakeLockAPI(); updateButtonState(Boolean(wakeLock)); } catch (e) {}
         }
       })();
+    }
+
+    // If import button is added later (app.js creates it dynamically), ensure our position is updated
+    const topBar = document.querySelector('#statsPage .top-bar');
+    if (topBar) {
+      const mo = new MutationObserver(() => {
+        // re-run creation/placement logic to ensure correct order
+        createToggleButton();
+        updateButtonState(localStorage.getItem(STORAGE_KEY) === '1');
+      });
+      mo.observe(topBar, { childList: true, subtree: false });
     }
   }
 
