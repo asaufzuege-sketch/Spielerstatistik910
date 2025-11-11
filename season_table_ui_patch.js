@@ -29,7 +29,7 @@
     const data = safeGetGoalValueData(); const bottom = safeGetGoalValueBottom();
     const vals = (data[name] && Array.isArray(data[name])) ? data[name] : [];
     let sum = 0;
-    for (let i = 0. i < bottom.length; i++) {
+    for (let i = 0; i < bottom.length; i++) {
       sum += (Number(vals[i] || 0) || 0) * (Number(bottom[i] || 0) || 0);
     }
     return sum;
@@ -97,9 +97,9 @@
             const meta = (c.getAttribute('data-col')||c.getAttribute('aria-label')||'').toLowerCase();
             return meta && meta.includes(token);
           });
-          if (candidate) row.appendChild(candidate);
-        }
-      });
+            if (candidate) row.appendChild(candidate);
+          }
+        });
     };
 
     if (idxMvpPoints !== -1) moveColumnByHeaderText('mvp points');
