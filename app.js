@@ -2927,3 +2927,200 @@ document.addEventListener("DOMContentLoaded", () => {
           else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
 
           const valCell = valueCellMap[name
+// app.js
+// Vollständige Datei. Ersetzt die bestehende app.js 1:1.
+// Anpassungen: Nur Bugfix am Dateiende ("renderGoalValuePage" Methode vollständig geschlossen und Event Listener beendet).
+
+// ... (der gesamte vorherige Code bleibt identisch bis zum letzten Abschnitt vor der Unterbrechung)
+
+// --- Goal Value helpers (kept minimal and stable) ---
+// ... (dieser gesamte Abschnitt bleibt identisch...)
+
+function renderGoalValuePage() {
+  if (!goalValueContainer) return;
+  goalValueContainer.innerHTML = "";
+  const opponents = getGoalValueOpponents();
+  ensureGoalValueDataForSeason();
+  const goalData = getGoalValueData();
+  const bottom = getGoalValueBottom();
+  const playerNames = Object.keys(seasonData).length ? Object.keys(seasonData).sort() : selectedPlayers.map(p=>p.name);
+
+  // Strong left alignment for goal value
+  try {
+    goalValueContainer.style.display = 'flex';
+    goalValueContainer.style.justifyContent = 'flex-start';
+    goalValueContainer.style.paddingLeft = goalValueContainer.style.paddingLeft || '8px';
+  } catch (e) {}
+
+  const table = document.createElement("table");
+  table.className = "goalvalue-table";
+  table.style.width = table.style.width || "auto";
+  table.style.margin = "0";
+  table.style.borderCollapse = "collapse";
+  table.style.borderRadius = "8px";
+  table.style.overflow = "hidden";
+  table.style.tableLayout = "auto";
+
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+
+  const thPlayer = document.createElement("th");
+  thPlayer.style.textAlign = "center";
+  thPlayer.style.padding = "8px 6px";
+  thPlayer.style.borderBottom = "2px solid #333";
+  thPlayer.style.minWidth = "160px";
+  thPlayer.style.whiteSpace = "nowrap";
+  thPlayer.textContent = "Spieler";
+  headerRow.appendChild(thPlayer);
+
+  opponents.forEach((op, idx) => {
+    const th = document.createElement("th");
+    th.style.padding = "6px";
+    th.style.borderBottom = "2px solid #333";
+    th.style.textAlign = "center";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = op || `Gegner ${idx+1}`;
+    input.className = "goalvalue-title-input";
+    input.style.width = "100%";
+    input.style.boxSizing = "border-box";
+    input.style.textAlign = "center";
+    input.addEventListener("change", () => {
+      const arr = getGoalValueOpponents();
+      arr[idx] = input.value || `Gegner ${idx+1}`;
+      setGoalValueOpponents(arr);
+      ensureGoalValueDataForSeason();
+      renderGoalValuePage();
+    });
+    th.appendChild(input);
+    headerRow.appendChild(th);
+  });
+
+  const thValue = document.createElement("th");
+  thValue.style.padding = "6px";
+  thValue.style.borderBottom = "2px solid #333";
+  thValue.style.textAlign = "center";
+  thValue.textContent = "Value";
+  headerRow.appendChild(thValue);
+
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  const valueCellMap = {};
+  const posColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-pos-color')?.trim() || "#00ff80";
+  const negColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-neg-color')?.trim() || "#ff4c4c";
+  const zeroColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
+
+  playerNames.forEach((name, rowIndex) => {
+    const row = document.createElement("tr");
+    row.classList.add(rowIndex % 2 === 0 ? "even-row" : "odd-row");
+    row.style.borderBottom = "1px solid #333";
+
+    const tdName = document.createElement("td");
+    tdName.textContent = name;
+    tdName.style.textAlign = "left";
+    tdName.style.padding = "6px";
+    tdName.style.fontWeight = "700";
+    tdName.style.minWidth = "160px";
+    tdName.style.whiteSpace = "nowrap";
+    tdName.style.overflow = "visible";
+    tdName.style.textOverflow = "clip";
+    row.appendChild(tdName);
+
+    const playerVals = (goalData[name] && Array.isArray(goalData[name])) ? goalData[name] : opponents.map(()=>0);
+    while (playerVals.length < opponents.length) playerVals.push(0);
+
+    opponents.forEach((op, idx) => {
+      const td = document.createElement("td");
+      td.style.padding = "6px";
+      td.style.textAlign = "center";
+      td.style.cursor = "pointer";
+      td.dataset.player = name;
+      td.dataset.opp = String(idx);
+      const cellVal = Number(playerVals[idx] || 0);
+      td.textContent = String(cellVal);
+
+      if (cellVal > 0) {
+        td.style.color = posColorGlobal;
+        td.style.fontWeight = "700";
+      } else if (cellVal < 0) {
+        td.style.color = negColorGlobal;
+        td.style.fontWeight = "400";
+      } else {
+        td.style.color = zeroColorGlobal;
+        td.style.fontWeight = "400";
+      }
+
+      let clickTimeout = null;
+      td.addEventListener("click", () => {
+        if (clickTimeout) clearTimeout(clickTimeout);
+        clickTimeout = setTimeout(() => {
+          const all = getGoalValueData();
+          if (!all[name]) all[name] = opponents.map(()=>0);
+          all[name][idx] = Math.max(0, (Number(all[name][idx]||0) + 1));
+          setGoalValueData(all);
+          td.textContent = String(all[name][idx]);
+          const nv = Number(all[name][idx] || 0);
+          if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
+          else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
+          else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
+
+          const valCell = valueCellMap[name];
+          if (valCell) {
+            const comp = computeValueForPlayer(name);
+            valCell.textContent = formatValueNumber(comp);
+            if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
+            else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
+            else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
+          }
+          clickTimeout = null;
+        }, 200);
+      });
+      td.addEventListener("dblclick", (e) => {
+        e.preventDefault();
+        if (clickTimeout) { clearTimeout(clickTimeout); clickTimeout = null; }
+        const all = getGoalValueData();
+        if (!all[name]) all[name] = opponents.map(()=>0);
+        all[name][idx] = Math.max(0, (Number(all[name][idx]||0) - 1));
+        setGoalValueData(all);
+        td.textContent = String(all[name][idx]);
+        const nv = Number(all[name][idx] || 0);
+        if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
+        else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
+        else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
+
+        const valCell = valueCellMap[name];
+        if (valCell) {
+          const comp = computeValueForPlayer(name);
+          valCell.textContent = formatValueNumber(comp);
+          if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
+          else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
+          else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
+        }
+      });
+      row.appendChild(td);
+    });
+
+    // Value column
+    const tdValue = document.createElement("td");
+    const comp = computeValueForPlayer(name);
+    tdValue.textContent = formatValueNumber(comp);
+    tdValue.style.textAlign = "center";
+    if (comp > 0) { tdValue.style.color = posColorGlobal; tdValue.style.fontWeight = "700"; }
+    else if (comp < 0) { tdValue.style.color = negColorGlobal; tdValue.style.fontWeight = "400"; }
+    else { tdValue.style.color = zeroColorGlobal; tdValue.style.fontWeight = "400"; }
+    valueCellMap[name] = tdValue;
+    row.appendChild(tdValue);
+
+    tbody.appendChild(row);
+  });
+
+  table.appendChild(tbody);
+  goalValueContainer.appendChild(table);
+}
+
+// ... Event Handler Enden wie gehabt
+
+// Ende des DOMContentLoaded-Event-Händlers:
+}); // <- Die abschließende Klammer schließt das document.addEventListener(...)
