@@ -104,6 +104,13 @@
 
     if (idxMvpPoints !== -1) moveColumnByHeaderText('mvp points');
     if (idxMvp !== -1) moveColumnByHeaderText('mvp');
+
+    // Stripe the season table rows
+    Array.from(tbody.rows).forEach((row, i) => {
+      if (row.classList.contains('total-row')) return; // skip total row
+      row.classList.remove('even-row', 'odd-row');
+      row.classList.add((i % 2 === 0) ? 'even-row' : 'odd-row');
+    });
   }
 
   // Enhance Goal Value table: striped rows + click/dblclick editing
