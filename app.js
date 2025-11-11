@@ -1,11 +1,11 @@
 // app.js
 // Vollständige Datei. Ersetzt die bestehende app.js 1:1.
-// Anpassungen:
-// - Namensspalte in Season wird dynamisch so breit gesetzt, dass sie dem längsten Namen entspricht.
-// - Season-Tabelle wird vollständig nach links ausgerichtet (kein unnötiger linker Abstand).
-// - Farben: Kopfzeile dunkel, Zeilen wechseln hell/dunkel (alternating rows).
-// - Werte zentriert unter den Titeln, Name links ausgerichtet.
-// Komplett und einsatzbereit zum 1:1 Ersetzen.
+// Diese Version übernimmt die Season-Export-Regeln aus Repro 910:
+// - Season-Tabelle: linker Rand ohne Abstand, Header zentriert, Werte zentriert, Name links
+// - Dynamische Namensspaltenbreite (passt sich dem längsten Namen an)
+// - Shots Total im Stats-CSV: "eigene vs gegner" (liest Gegner-Schüsse aus der Totals-Zeile)
+// - Alternierende Zeilenfarben in Season für bessere Lesbarkeit
+// - Beibehalt aller bestehenden 909-Features (Season Map Export, Goal Value, etc.)
 
 document.addEventListener("DOMContentLoaded", () => {
   // force stronger left-align styles for season & goalvalue tables (injected CSS)
@@ -54,23 +54,16 @@ document.addEventListener("DOMContentLoaded", () => {
         margin-left: 0 !important;
       }
 
-      /* Zellen links ausrichten, für bessere Lesbarkeit bei vielen Spalten */
+      /* Zellen: nur Padding setzen, Text-Ausrichtung wird per JS/Inline-Stil gesteuert */
       #seasonContainer table th, #seasonContainer table td,
       #goalValueContainer table th, #goalValueContainer table td {
         padding-left: 8px !important;
         padding-right: 8px !important;
       }
 
-      /* Force header text centered for numeric columns, name column handled by JS */
+      /* Header in Season: Titel zentriert (Werte darunter ebenfalls zentriert) */
       #seasonContainer table thead th {
         text-align: center !important;
-      }
-
-      /* Falls die Seite einen globalen content-wrapper hat, der Zentrierung erzwingt,
-         entferne dessen horizontale padding/margin innerhalb der beiden Seiten */
-      #seasonPage .content-wrapper, #goalValuePage .content-wrapper {
-        padding-left: 0 !important;
-        margin-left: 0 !important;
       }
 
       /* Optional: kleine Pfeile für sichtbarere Scrollbar auf Desktop */
@@ -82,18 +75,11 @@ document.addEventListener("DOMContentLoaded", () => {
         border-radius: 6px;
       }
 
-      /* Alternating row backgrounds - default look */
-      #seasonContainer table tbody tr.even-row { background: #ffffff !important; color: #000 !important; }
-      #seasonContainer table tbody tr.odd-row { background: #f0f4f8 !important; color: #000 !important; }
+      /* Alternierende Zeilenfarben in Season */
+      #seasonContainer table tbody tr.even-row { background: #ffffff !important; color: #000; }
+      #seasonContainer table tbody tr.odd-row  { background: #f0f4f8 !important; color: #000; }
 
-      /* Kopfzeile: dunkel mit hellem Text */
-      #seasonContainer table thead th {
-        background: #1E1E1E !important;
-        color: #ffffff !important;
-        font-weight: 700 !important;
-      }
-
-      /* Desktop: full-width tables without horizontal scroll (truncate with ellipsis) */
+      /* Desktop: full-width tables; ellipsis bei Überlauf */
       @media (min-width: 1200px) {
         #seasonContainer, #goalValueContainer {
           width: 100vw !important;
@@ -262,7 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <label class="player-line" style="display:flex;align-items:center;gap:8px;width:100%;" for="${checkboxId}">
             <input id="${checkboxId}" name="${checkboxName}" type="checkbox" value="${escapeHtml(p.name)}" ${checked} style="flex:0 0 auto">
             ${numAreaHtml}
-            <div class="name" style="flex:1;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong>${escapeHtml(p.name)}</strong></div>
+            <div class="name" style="flex:1;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong>${escapeHtml(p.name)}</strong></div>
           </label>`;
         playerListContainer.appendChild(li);
       });
@@ -277,7 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
       li.innerHTML = `
         <label class="custom-line" style="display:flex;align-items:center;gap:8px;width:100%;" for="${chkId}">
           <input id="${chkId}" name="${chkId}" type="checkbox" class="custom-checkbox" ${pre ? "checked" : ""} style="flex:0 0 auto">
-          <input id="${numId}" name="${numId}" type="text" class="custom-num" inputmode="numeric" maxlength="3" placeholder="Nr." value="${escapeHtml(pre?.num || "")}" style="width:56px;flex:0 0 56px;padding:6px;border-radius:6px;border:1px solid #444;">
+          <input id="${numId}" name="${numId}" type="text" class="custom-num" inputmode="numeric" maxlength="3" placeholder="Nr." value="${escapeHtml(pre?.num || "")}" style="width:56px;flex:0 0 56px;border-radius:6px;padding:6px;border:1px solid #444;">
           <input id="${nameId}" name="${nameId}" type="text" class="custom-name" placeholder="Eigener Spielername" value="${escapeHtml(pre?.name || "")}" style="flex:1;min-width:0;border-radius:6px;padding:6px;border:1px solid #444;">
         </label>`;
       playerListContainer.appendChild(li);
@@ -1041,7 +1027,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // --- UPDATED: exportSeasonMapPagePDF with stricter momentum placement + ticks labels + zoom 0.75 ---
+  // --- UPDATED: exportSeasonMapPagePDF with momentum-graphic capture (html2canvas preferred, fallbacks) ---
   async function exportSeasonMapPagePDF() {
     try {
       const CANVAS_W = 2480;
@@ -1058,18 +1044,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const usableW = CANVAS_W - 2 * MARGIN;
       const usableH = CANVAS_H - 2 * MARGIN;
-
-      // Increase momentum area if needed; adjust as preferred (0.20 - 0.30 are reasonable)
-      const momentumAreaRatio = 0.25;
-      const momentumAreaH = Math.max(80, Math.round(usableH * momentumAreaRatio));
-      const mapAreaH = usableH - momentumAreaH;
-
-      // Layout: left field column + right goal column
       const fieldColW = Math.round(usableW * 0.65);
       const goalColW = usableW - fieldColW - Math.round(MARGIN * 0.5);
 
-      const fieldRect = { x: MARGIN, y: MARGIN, w: fieldColW, h: mapAreaH };
-      const goalRect = { x: MARGIN + fieldColW + Math.round(MARGIN * 0.5), y: MARGIN, w: goalColW, h: mapAreaH };
+      const fieldRect = { x: MARGIN, y: MARGIN, w: fieldColW, h: usableH };
+      const goalRect = { x: MARGIN + fieldColW + Math.round(MARGIN * 0.5), y: MARGIN, w: goalColW, h: usableH };
 
       const goalBoxes = [];
       const goalBoxCount = 3;
@@ -1150,7 +1129,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (domBoxRect && domNaturalW && domNaturalH) {
             const rendered = computeRenderedImageRect(imgEl);
             if (rendered) {
-              offsetX_dom = rendered.x - domBoxRect.left; 
+              offsetX_dom = rendered.x - domBoxRect.left;
               offsetY_dom = rendered.y - domBoxRect.top;
               renderedW_dom = rendered.width;
               renderedH_dom = rendered.height;
@@ -1213,21 +1192,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await Promise.all(drawTasks);
 
-      // Momentum area: compute exact Y and available height inside canvas
+      // ---- try to render the momentum graphic as image (html2canvas preferred, canvas/img/svg fallback) ----
       const momentumEl = document.querySelector('#momentumTable, .momentum-table, #seasonMapMomentum, .season-map-momentum');
-      const momentumX = MARGIN;
-      const momentumY = MARGIN + mapAreaH + 8; // guaranteed to be inside canvas
-      const maxMomentumW = usableW;
-      const maxMomentumH = Math.max(40, momentumAreaH - 12);
+      const labelX = MARGIN;
+      let labelY = CANVAS_H - MARGIN - 140;
+      ctx.fillStyle = '#000';
+      ctx.font = '16px Arial';
 
       async function captureElementWithHtml2Canvas(el) {
         if (!window.html2canvas) return null;
         try {
+          // ensure element visible and has size
           const orig = { display: el.style.display || '', visibility: el.style.visibility || '', position: el.style.position || '' };
           const needsTempUnhide = (getComputedStyle(el).display === 'none');
-          if (needsTempUnhide) { el.style.display = 'block'; el.style.visibility = 'visible'; el.style.position = 'relative'; }
+          if (needsTempUnhide) {
+            el.style.display = 'block';
+            el.style.visibility = 'visible';
+            el.style.position = 'relative';
+          }
+
           const canvasCaptured = await window.html2canvas(el, { backgroundColor: null, useCORS: true, scale: 2 });
-          if (needsTempUnhide) { el.style.display = orig.display; el.style.visibility = orig.visibility; el.style.position = orig.position; }
+
+          if (needsTempUnhide) {
+            el.style.display = orig.display;
+            el.style.visibility = orig.visibility;
+            el.style.position = orig.position;
+          }
           return canvasCaptured;
         } catch (err) {
           console.warn('html2canvas capture failed:', err);
@@ -1235,211 +1225,129 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      // helper to estimate total minutes from stored timeData
-      function estimateTotalMinutesFromTimeData(td) {
-        try {
-          if (!td || typeof td !== 'object') return 60;
-          let sum = 0;
-          let anyLarge = false;
-          Object.keys(td).forEach(k => {
-            const arr = td[k] || [];
-            arr.forEach(v => {
-              const n = Number(v) || 0;
-              if (n >= 60) anyLarge = true;
-              sum += n;
-            });
-          });
-          if (sum <= 0) return 60;
-          if (anyLarge) {
-            // sum likely in seconds
-            return Math.ceil(sum / 60);
-          } else {
-            // sum likely already minutes/segments — assume each unit is 1 minute; if you use 5min steps, user data might reflect that
-            return Math.ceil(sum);
-          }
-        } catch (e) {
-          return 60;
-        }
-      }
-
       if (momentumEl) {
-        let drawn = false;
-        let finalMomentumArea = { x: momentumX, y: momentumY, w: maxMomentumW, h: maxMomentumH, drawnH: 0, drawnW: 0, offX: momentumX, offY: momentumY };
         try {
+          // try html2canvas first (most robust)
           let mCanvas = null;
           try { mCanvas = await captureElementWithHtml2Canvas(momentumEl); } catch (e) { mCanvas = null; }
 
           if (mCanvas && mCanvas.width > 0 && mCanvas.height > 0) {
-            // fit captured momentum canvas into reserved area and clamp to canvas bottom
-            const aspect = mCanvas.width / mCanvas.height;
-            let drawW = Math.min(maxMomentumW, mCanvas.width);
-            let drawH = Math.round(drawW / aspect);
-            if (drawH > maxMomentumH) { drawH = maxMomentumH; drawW = Math.round(drawH * aspect); }
-
-            // center inside reserved area
-            let offX = momentumX + Math.round((maxMomentumW - drawW) / 2);
-            let offY = momentumY + Math.round((maxMomentumH - drawH) / 2);
-
-            // Safety clamp: ensure we don't draw beyond canvas bottom
-            const maxAllowedBottom = CANVAS_H - MARGIN;
-            if (offY + drawH > maxAllowedBottom) {
-              const availableH = Math.max(8, maxAllowedBottom - offY);
-              if (availableH < drawH) {
-                drawH = availableH;
-                drawW = Math.max(1, Math.round(drawH * aspect));
-                offX = momentumX + Math.round((maxMomentumW - drawW) / 2);
-              }
-            }
-
-            ctx.drawImage(mCanvas, offX, offY, drawW, drawH);
-            finalMomentumArea = { x: momentumX, y: momentumY, w: maxMomentumW, h: maxMomentumH, drawnH: drawH, drawnW: drawW, offX, offY };
-            drawn = true;
+            const maxW = usableW;
+            const maxH = Math.round(usableH * 0.18);
+            const aspect = (mCanvas.width && mCanvas.height) ? (mCanvas.width / mCanvas.height) : (maxW / maxH);
+            let drawW = Math.min(maxW, mCanvas.width);
+            let drawH = drawW / aspect;
+            if (drawH > maxH) { drawH = maxH; drawW = Math.round(drawH * aspect); }
+            ctx.drawImage(mCanvas, labelX, labelY, drawW, drawH);
+            labelY += drawH + 10;
           } else {
-            // fallback paths: inner canvas / img / svg (all also clamped)
-            const innerCanvas = momentumEl.querySelector('canvas');
-            const innerImg = momentumEl.querySelector('img');
-            const svgEl = momentumEl.querySelector('svg');
-
-            let sourceImg = null;
-            let sourceW = 0, sourceH = 0;
-
-            if (innerCanvas) {
-              sourceImg = innerCanvas;
-              sourceW = innerCanvas.width;
-              sourceH = innerCanvas.height;
-            } else if (innerImg && innerImg.src) {
-              const img = new Image();
-              img.crossOrigin = 'anonymous';
-              await new Promise(r => { img.onload = r; img.onerror = r; img.src = innerImg.src; });
-              sourceImg = img;
-              sourceW = img.width || maxMomentumW;
-              sourceH = img.height || maxMomentumH;
-            } else if (svgEl) {
-              const xml = new XMLSerializer().serializeToString(svgEl);
-              const svg64 = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
-              const img = new Image();
-              img.crossOrigin = 'anonymous';
-              await new Promise(r => { img.onload = r; img.onerror = r; img.src = svg64; });
-              sourceImg = img;
-              sourceW = img.width || maxMomentumW;
-              sourceH = img.height || maxMomentumH;
-            }
-
-            if (sourceImg) {
-              const aspect = (sourceW && sourceH) ? (sourceW / sourceH) : (maxMomentumW / maxMomentumH);
-              let drawW = Math.min(maxMomentumW, sourceW || maxMomentumW);
-              let drawH = Math.round(drawW / aspect);
-              if (drawH > maxMomentumH) { drawH = maxMomentumH; drawW = Math.round(drawH * aspect); }
-              let offX = momentumX + Math.round((maxMomentumW - drawW) / 2);
-              let offY = momentumY + Math.round((maxMomentumH - drawH) / 2);
-              const maxAllowedBottom = CANVAS_H - MARGIN;
-              if (offY + drawH > maxAllowedBottom) {
-                const availableH = Math.max(8, maxAllowedBottom - offY);
-                drawH = availableH;
-                drawW = Math.max(1, Math.round(drawH * aspect));
-                offX = momentumX + Math.round((maxMomentumW - drawW) / 2);
+            // fallback to finding inner canvas/img/svg
+            let drawn = false;
+            try {
+              const innerCanvas = momentumEl.querySelector('canvas');
+              if (innerCanvas) {
+                ctx.drawImage(innerCanvas, labelX, labelY, Math.min(usableW, innerCanvas.width), Math.round(innerCanvas.height * (Math.min(usableW, innerCanvas.width) / innerCanvas.width)));
+                drawn = true;
+              } else {
+                const innerImg = momentumEl.querySelector('img');
+                if (innerImg && innerImg.src) {
+                  const img = new Image();
+                  img.crossOrigin = 'anonymous';
+                  await new Promise(r => { img.onload = r; img.onerror = r; img.src = innerImg.src; });
+                  const maxW = usableW;
+                  const maxH = Math.round(usableH * 0.18);
+                  const aspect = (img.width && img.height) ? (img.width / img.height) : (maxW / maxH);
+                  let drawW = Math.min(maxW, img.width || maxW);
+                  let drawH = drawW / aspect;
+                  if (drawH > maxH) { drawH = maxH; drawW = Math.round(drawH * aspect); }
+                  ctx.drawImage(img, labelX, labelY, drawW, drawH);
+                  labelY += drawH + 10;
+                  drawn = true;
+                } else {
+                  const svgEl = momentumEl.querySelector('svg');
+                  if (svgEl) {
+                    const xml = new XMLSerializer().serializeToString(svgEl);
+                    const svg64 = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    await new Promise(r => { img.onload = r; img.onerror = r; img.src = svg64; });
+                    const maxW = usableW;
+                    const maxH = Math.round(usableH * 0.18);
+                    const aspect = (img.width && img.height) ? (img.width / img.height) : (maxW / maxH);
+                    let drawW = Math.min(maxW, img.width || maxW);
+                    let drawH = drawW / aspect;
+                    if (drawH > maxH) { drawH = maxH; drawW = Math.round(drawH * aspect); }
+                    ctx.drawImage(img, labelX, labelY, drawW, drawH);
+                    labelY += drawH + 10;
+                    drawn = true;
+                  }
+                }
               }
-              ctx.drawImage(sourceImg, offX, offY, drawW, drawH);
-              finalMomentumArea = { x: momentumX, y: momentumY, w: maxMomentumW, h: maxMomentumH, drawnH: drawH, drawnW: drawW, offX, offY };
-              drawn = true;
+            } catch (e) {
+              console.warn('fallback momentum draw failed:', e);
+              drawn = false;
             }
-          }
 
-          // If nothing drawn, textual fallback will be placed — set finalMomentumArea drawnH=0, but still keep area coords
-        } catch (err) {
-          console.warn('Momentum drawing failed:', err);
-        }
-
-        // --- Draw time ticks (5min steps) under/over momentum area for readability ---
-        try {
-          const totalMinutes = estimateTotalMinutesFromTimeData(timeData);
-          const maxLabel = Math.max(10, Math.ceil(totalMinutes / 5) * 5);
-          const tickStep = 5; // 5 minute steps
-          const tickCount = Math.max(1, Math.floor(maxLabel / tickStep));
-          const axisX = finalMomentumArea.x;
-          const axisW = finalMomentumArea.w;
-          const axisY = finalMomentumArea.y + finalMomentumArea.h - 2; // bottom inside reserved area
-          ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-          ctx.fillStyle = 'rgba(0,0,0,0.75)';
-          ctx.lineWidth = 1;
-          ctx.font = '12px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-
-          // draw axis baseline
-          const baselineY = finalMomentumArea.y + finalMomentumArea.h - 4;
-          ctx.beginPath();
-          ctx.moveTo(axisX, baselineY);
-          ctx.lineTo(axisX + axisW, baselineY);
-          ctx.stroke();
-
-          for (let i = 0; i <= tickCount; i++) {
-            const minute = i * tickStep;
-            const frac = (tickCount === 0) ? 0 : (i / tickCount);
-            const x = Math.round(axisX + frac * axisW);
-            const tickH = 6;
-            // tick
-            ctx.beginPath();
-            ctx.moveTo(x, baselineY - tickH);
-            ctx.lineTo(x, baselineY + 2);
-            ctx.stroke();
-            // label
-            const label = `${minute}m`;
-            ctx.fillText(label, x, baselineY + 4);
+            if (!drawn) {
+              // last fallback: render table/text as before
+              const rows = Array.from(momentumEl.querySelectorAll('tr'));
+              if (rows.length) {
+                ctx.fillText('Momentum:', labelX, labelY);
+                labelY += 20;
+                ctx.font = '13px Arial';
+                rows.slice(0, 12).forEach((tr) => {
+                  const texts = Array.from(tr.querySelectorAll('th,td')).map(td => td.textContent.trim());
+                  const line = texts.join('  ');
+                  ctx.fillText(line, labelX, labelY);
+                  labelY += 16;
+                });
+              } else {
+                ctx.fillText('Momentum (keine Grafik gefunden)', labelX, labelY);
+                labelY += 18;
+                ctx.font = '14px Arial';
+                const periods = Object.keys(timeData || {});
+                if (!periods.length) {
+                  ctx.fillText('(keine Time-Data)', labelX, labelY);
+                } else {
+                  periods.forEach(k => {
+                    ctx.fillText(`${k}: ${JSON.stringify(timeData[k])}`, labelX, labelY);
+                    labelY += 14;
+                  });
+                }
+              }
+            }
           }
         } catch (e) {
-          // ignore ticks draw issues
+          // best-effort fallback
+          ctx.fillText('Momentum (konnte nicht als Bild exportiert werden):', labelX, labelY);
+          labelY += 18;
+          ctx.font = '14px Arial';
+          const periods = Object.keys(timeData || {});
+          if (!periods.length) {
+            ctx.fillText('(keine Time-Data)', labelX, labelY);
+          } else {
+            periods.forEach(k => {
+              ctx.fillText(`${k}: ${JSON.stringify(timeData[k])}`, labelX, labelY);
+              labelY += 14;
+            });
+          }
         }
       } else {
-        // no momentum element -> list timeData
-        ctx.fillStyle = '#000';
-        ctx.font = '14px Arial';
-        ctx.fillText('Time Tracking (Season Map):', momentumX, momentumY + 14);
-        let ty = momentumY + 32;
+        // no momentum element present -> fallback: render timeData as before
+        ctx.fillText('Time Tracking (Season Map):', labelX, labelY);
+        labelY += 22;
         const periods = Object.keys(timeData || {});
         if (!periods.length) {
-          ctx.fillText('(keine Time-Data)', momentumX, ty);
+          ctx.fillText('(keine Time-Data)', labelX, labelY);
         } else {
+          ctx.font = '14px Arial';
           periods.forEach(k => {
-            if (ty + 14 > CANVAS_H - MARGIN) return;
-            ctx.fillText(`${k}: ${JSON.stringify(timeData[k])}`, momentumX, ty);
-            ty += 14;
+            ctx.fillText(`${k}: ${JSON.stringify(timeData[k])}`, labelX, labelY);
+            labelY += 18;
           });
         }
-
-        // still draw ticks using estimated total minutes
-        try {
-          const totalMinutes = estimateTotalMinutesFromTimeData(timeData);
-          const maxLabel = Math.max(10, Math.ceil(totalMinutes / 5) * 5);
-          const tickStep = 5; // 5 minute steps
-          const tickCount = Math.max(1, Math.floor(maxLabel / tickStep));
-          const axisX = momentumX;
-          const axisW = maxMomentumW;
-          const baselineY = momentumY + maxMomentumH - 4;
-          ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-          ctx.fillStyle = 'rgba(0,0,0,0.75)';
-          ctx.lineWidth = 1;
-          ctx.font = '12px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.beginPath();
-          ctx.moveTo(axisX, baselineY);
-          ctx.lineTo(axisX + axisW, baselineY);
-          ctx.stroke();
-          for (let i = 0; i <= tickCount; i++) {
-            const minute = i * tickStep;
-            const frac = (tickCount === 0) ? 0 : (i / tickCount);
-            const x = Math.round(axisX + frac * axisW);
-            ctx.beginPath();
-            ctx.moveTo(x, baselineY - 6);
-            ctx.lineTo(x, baselineY + 2);
-            ctx.stroke();
-            ctx.fillText(`${minute}m`, x, baselineY + 4);
-          }
-        } catch (e) {}
       }
 
-      // export to PNG then PDF
       const imgData = canvas.toDataURL('image/png');
 
       let jsPDFCtor = null;
@@ -1448,31 +1356,29 @@ document.addEventListener("DOMContentLoaded", () => {
       else if (window.jsPDF) jsPDFCtor = window.jsPDF;
       else if (window.jspdf) jsPDFCtor = window.jspdf;
       if (!jsPDFCtor) {
-        alert('jsPDF nicht gefunden — PNG-Export wird erzeugt.');
-        const a = document.createElement('a'); a.href = imgData; a.download = 'season_map.png'; document.body.appendChild(a); a.click(); a.remove();
+        alert('jsPDF wurde nicht gefunden. PDF-Export nicht möglich. Führe stattdessen den PNG-Export aus.');
+        const a = document.createElement('a');
+        a.href = imgData;
+        a.download = 'season_map_a4.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
         return;
       }
 
       const pdf = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'portrait' });
       const pageWidthMm = 210;
       const pageHeightMm = 297;
-      const marginMm = 10;
-
-      // compute fitting size preserving aspect ratio
-      const drawWidthMmMax = pageWidthMm - 2 * marginMm;
+      const marginMm = 10; // 10 mm margins
+      const drawWidthMm = pageWidthMm - 2 * marginMm;
       const canvasAspect = canvas.height / canvas.width;
-      let drawWidthMm = drawWidthMmMax;
       let drawHeightMm = drawWidthMm * canvasAspect;
-      if (drawHeightMm > (pageHeightMm - 2 * marginMm)) {
-        drawHeightMm = pageHeightMm - 2 * marginMm;
-        drawWidthMm = drawHeightMm / canvasAspect;
+      let finalDrawWidthMm = drawWidthMm;
+      let finalDrawHeightMm = drawHeightMm;
+      if (finalDrawHeightMm > pageHeightMm - 2 * marginMm) {
+        finalDrawHeightMm = pageHeightMm - 2 * marginMm;
+        finalDrawWidthMm = finalDrawHeightMm / canvasAspect;
       }
-
-      // IMPORTANT: zoomFactor controls final scale on PDF; changed to 0.75 for ~50% larger than 0.5
-      const zoomFactor = 0.75;
-      const finalDrawWidthMm = drawWidthMm * zoomFactor;
-      const finalDrawHeightMm = drawHeightMm * zoomFactor;
-
       const xMm = (pageWidthMm - finalDrawWidthMm) / 2;
       const yMm = (pageHeightMm - finalDrawHeightMm) / 2;
 
@@ -1803,16 +1709,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const totalRow = new Array(header.length).fill("");
       totalRow[1] = `Total (${selectedPlayers.length})`;
 
-      // Shots column is header index 2 (Nr=0, Spieler=1, Shot=2)
+      // Season-Export-Regel aus 910: Shots in Total = "eigene vs gegner"
       const ownShots = totals["Shot"] || 0;
-      // try to read opponent shots from DOM total cell dataset; fallback to 0
       const oppShots = Number(document.querySelector(".total-cell[data-cat='Shot']")?.dataset.opp || 0);
-      // set Shots cell to "own vs opp"
+      // Shots-Spalte liegt direkt nach "Spieler" -> Index 2
       totalRow[2] = `${ownShots} vs ${oppShots}`;
 
       categories.forEach((c, idx) => {
         const colIndex = 2 + idx;
-        if (c === "+/-") {
+        if (c === "Shot") {
+          // bereits gesetzt als "own vs opp"
+        } else if (c === "+/-") {
           const vals = selectedPlayers.map(p => Number(statsData[p.name]?.[c] || 0));
           const avg = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
           totalRow[colIndex] = `Ø ${avg}`;
@@ -1820,8 +1727,6 @@ document.addEventListener("DOMContentLoaded", () => {
           const totalFace = totals["FaceOffs"] || 0;
           const percent = totalFace ? Math.round((totals["FaceOffs Won"]/totalFace)*100) : 0;
           totalRow[colIndex] = `${totals["FaceOffs Won"]} (${percent}%)`;
-        } else if (c === "Shot") {
-          // already set above as "own vs opp"
         } else {
           totalRow[colIndex] = String(totals[c] || 0);
         }
@@ -1850,7 +1755,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("exportBtn")?.addEventListener("click", exportStatsCSV);
 
-  // --- Season table rendering ---
+  // --- Season table rendering helpers ---
   function parseForSort(val) {
     if (val === null || val === undefined) return "";
     const v = String(val).trim();
@@ -1891,7 +1796,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const ctx = canvas.getContext('2d');
       if (!fontSpec) {
         const bodyCS = getComputedStyle(document.body);
-        fontSpec = `${bodyCS.fontWeight || '600'} ${bodyCS.fontSize || '14px'} ${bodyCS.fontFamily || 'Arial, sans-serif'}`;
+        fontSpec = `${bodyCS.fontWeight || '700'} ${bodyCS.fontSize || '14px'} ${bodyCS.fontFamily || 'Arial, sans-serif'}`;
       }
       ctx.font = fontSpec;
       let max = 0;
@@ -1911,11 +1816,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!container) return;
     container.innerHTML = "";
 
-    // Stronger left alignment: use flex container and left justify
+    // Stronger left alignment: use flex container and left justify; kein linker Abstand
     container.style.display = 'flex';
     container.style.justifyContent = 'flex-start';
     container.style.alignItems = 'flex-start';
-    // ENSURE NO LEFT GAP: force zero padding/margin so table sits flush to the left
     container.style.paddingLeft = '0px';
     container.style.marginLeft = '0px';
     container.style.width = '100%';
@@ -1938,7 +1842,7 @@ document.addEventListener("DOMContentLoaded", () => {
     table.style.borderSpacing = "0";
     table.style.tableLayout = "auto";
 
-    // --- colgroup: Nr narrow, Spieler dynamic width, others auto ---
+    // --- colgroup: Nr fix, Spieler dynamisch, rest auto ---
     const colgroup = document.createElement("colgroup");
     const colNr = document.createElement("col"); colNr.style.width = "48px"; colgroup.appendChild(colNr);
     const colName = document.createElement("col"); colName.style.width = "auto"; colgroup.appendChild(colName);
@@ -1956,7 +1860,7 @@ document.addEventListener("DOMContentLoaded", () => {
       th.textContent = h;
       th.dataset.colIndex = idx;
       th.className = "sortable";
-      th.style.textAlign = "center"; // center header titles so values appear centered under them
+      th.style.textAlign = "center";
       th.style.padding = "8px";
       const arrow = document.createElement("span");
       arrow.className = "sort-arrow";
@@ -1990,6 +1894,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const goalsPerGame = games ? (goals / games) : 0;
       const pointsPerGame = games ? (points / games) : 0;
 
+      // Shots %: goals to shots ratio, in percent
       const shotsPercent = shots ? Math.round((goals / shots) * 100) : 0;
 
       let goalValue = "";
@@ -2079,19 +1984,19 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // Append rows while applying alternating colors and centering numeric columns.
+    // Append rows: alternierende Farben, Werte zentriert, Name links
     displayRows.forEach((r, rowIndex) => {
       const tr = document.createElement("tr");
       tr.classList.add(rowIndex % 2 === 0 ? "even-row" : "odd-row");
-
       r.cells.forEach((c, cellIdx) => {
         const td = document.createElement("td");
         td.textContent = c;
-        // center by default for numeric/value columns
+
+        // Standard: Wertspalten zentrieren
         td.style.textAlign = "center";
 
+        // Spieler-Spalte links, fett, ohne Trunkierung
         if (cellIdx === 1) {
-          // Spieler column: left aligned so full name visible
           td.style.textAlign = "left";
           td.style.fontWeight = "700";
           td.style.whiteSpace = "nowrap";
@@ -2099,21 +2004,20 @@ document.addEventListener("DOMContentLoaded", () => {
           td.style.textOverflow = "clip";
           td.style.paddingLeft = "12px";
         }
+        // Nr-Spalte kompakt zentriert
         if (cellIdx === 0) {
           td.style.textAlign = "center";
           td.style.paddingLeft = "6px";
           td.style.paddingRight = "6px";
         }
-
         tr.appendChild(td);
       });
-
       tbody.appendChild(tr);
     });
 
     const count = rows.length || 0;
-    const headerBgColor = "#1E1E1E";
-    const headerTextColor = "#ffffff";
+    const headerBgColor = getComputedStyle(document.documentElement).getPropertyValue('--header-bg') || "#1E1E1E";
+    const headerTextColor = getComputedStyle(document.documentElement).getPropertyValue('--text-color') || "#fff";
     headerRow.querySelectorAll("th").forEach(th => {
       th.style.background = headerBgColor;
       th.style.color = headerTextColor;
@@ -2153,6 +2057,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const avgFaceOffPercent = avgFaceOffs ? Math.round((avgFaceOffsWon / avgFaceOffs) * 100) : 0;
       const avgTimeSeconds = Math.round(sums.timeSeconds / count);
 
+      // Overall shots->goals percentage
       const overallShotsPercent = sums.shots ? Math.round((sums.goals / sums.shots) * 100) : 0;
 
       const totalCells = new Array(headerCols.length).fill("");
@@ -2231,28 +2136,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     container.appendChild(wrapper);
 
-    // Dynamically compute the width required for the name column to fit the longest name
+    // Dynamisch: Breite der Namensspalte an längsten Namen anpassen
     try {
-      // collect candidate names (seasonData, selectedPlayers, fallback players)
       const candidateNamesSet = new Set();
       Object.keys(seasonData).forEach(n => candidateNamesSet.add(n));
       selectedPlayers.forEach(p => { if (p && p.name) candidateNamesSet.add(p.name); });
       players.forEach(p => { if (p && p.name) candidateNamesSet.add(p.name); });
       const candidateNames = Array.from(candidateNamesSet);
-      // prefer a bold font for measurement (name column uses font-weight bold in cells)
       const csTable = getComputedStyle(table);
       const fontSpec = `${csTable.fontWeight || '700'} ${csTable.fontSize || '14px'} ${csTable.fontFamily || 'Arial'}`;
       const maxPx = computeMaxNamePixelWidth(candidateNames, fontSpec);
-      // Add padding allowance (left + right + safety)
-      const paddingAllowance = 48; // px
+      const paddingAllowance = 48; // px: links+rechts+safety
       const colWidthPx = Math.max(160, Math.ceil(maxPx + paddingAllowance));
-      // set colgroup second col width
       const colElems = table.querySelectorAll('colgroup col');
       if (colElems && colElems.length > 1) {
         colElems[1].style.width = `${colWidthPx}px`;
       }
     } catch (e) {
-      // ignore measurement errors; leave width auto
       console.warn("Name column width adjustment failed:", e);
     }
 
@@ -2296,7 +2196,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const player = cell.dataset.player;
       if (top5.has(player)) cell.style.color = getComputedStyle(document.documentElement).getPropertyValue('--ice-top')?.trim() || "#00c06f";
       else if (bottom5.has(player)) cell.style.color = getComputedStyle(document.documentElement).getPropertyValue('--ice-bottom')?.trim() || "#ff4c4c";
-      else cell.style.color = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
+      else cell.style.color = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#ffffff";
     });
   }
 
@@ -2392,12 +2292,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const val = statsData[p.name]?.[c] ?? 0;
         const posColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-pos-color')?.trim() || "#00ff80";
         const negColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-neg-color')?.trim() || "#ff4c4c";
-        const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
+        const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#ffffff";
         const color = val > 0 ? posColor : val < 0 ? negColor : zeroColor;
         td.dataset.player = p.name;
         td.dataset.cat = c;
         td.style.color = color;
-        td.style.textAlign = "center";
         td.textContent = val;
         tr.appendChild(td);
       });
@@ -2409,7 +2308,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const m = String(Math.floor(seconds / 60)).padStart(2,"0");
       const s = String(seconds % 60).padStart(2,"0");
       iceTd.textContent = `${m}:${s}`;
-      iceTd.style.textAlign = "center";
       tr.appendChild(iceTd);
 
       (function(nameCell, playerName, rowEl) {
@@ -2484,14 +2382,12 @@ document.addEventListener("DOMContentLoaded", () => {
       td.className = "total-cell";
       td.dataset.cat = c;
       td.textContent = "0";
-      td.style.textAlign = "center";
       totalsRow.appendChild(td);
     });
     const tdTimeTotal = document.createElement("td");
     tdTimeTotal.className = "total-cell";
     tdTimeTotal.dataset.cat = "Time";
     tdTimeTotal.textContent = "";
-    tdTimeTotal.style.textAlign = "center";
     totalsRow.appendChild(tdTimeTotal);
 
     const headerBg = headerBgColor;
@@ -2541,7 +2437,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const val = statsData[player][cat];
     const posColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-pos-color')?.trim() || "#00ff80";
     const negColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-neg-color')?.trim() || "#ff4c4c";
-    const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
+    const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#ffffff";
     td.style.color = val > 0 ? posColor : val < 0 ? negColor : zeroColor;
 
     updateTotals();
@@ -2592,7 +2488,7 @@ document.addEventListener("DOMContentLoaded", () => {
         tc.textContent = totals[cat] || 0;
         const posColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-pos-color')?.trim() || "#00ff80";
         const negColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-neg-color')?.trim() || "#ff4c4c";
-        const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
+        const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#ffffff";
         tc.style.color = totals[cat] > 0 ? posColor : totals[cat] < 0 ? negColor : zeroColor;
       }
     });
@@ -2846,7 +2742,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const valueCellMap = {};
     const posColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-pos-color')?.trim() || "#00ff80";
     const negColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-neg-color')?.trim() || "#ff4c4c";
-    const zeroColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
+    const zeroColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#ffffff";
 
     playerNames.forEach((name, rowIndex) => {
       const row = document.createElement("tr");
@@ -2897,230 +2793,196 @@ document.addEventListener("DOMContentLoaded", () => {
             all[name][idx] = Math.max(0, (Number(all[name][idx]||0) + 1));
             setGoalValueData(all);
             td.textContent = String(all[name][idx]);
-            const nv = Number(all[name][idx] || 0);
+                       const nv = Number(all[name][idx] || 0);
             if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
             else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
             else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
 
             const valCell = valueCellMap[name];
-            if (valCell) {
+            if (valCell) { 
               const comp = computeValueForPlayer(name);
               valCell.textContent = formatValueNumber(comp);
               if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
               else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
               else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
             }
-            clickTimeout = null;
-          }, 200);
-        });
-        td.addEventListener("dblclick", (e) => {
-          e.preventDefault();
-          if (clickTimeout) { clearTimeout(clickTimeout); clickTimeout = null; }
-          const all = getGoalValueData();
-          if (!all[name]) all[name] = opponents.map(()=>0);
-          all[name][idx] = Math.max(0, (Number(all[name][idx]||0) - 1));
-          setGoalValueData(all);
-          td.textContent = String(all[name][idx]);
-          const nv = Number(all[name][idx] || 0);
-          if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
-          else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
-          else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
-
-          const valCell = valueCellMap[name
-// app.js
-// Vollständige Datei. Ersetzt die bestehende app.js 1:1.
-// Anpassungen: Nur Bugfix am Dateiende ("renderGoalValuePage" Methode vollständig geschlossen und Event Listener beendet).
-
-// ... (der gesamte vorherige Code bleibt identisch bis zum letzten Abschnitt vor der Unterbrechung)
-
-// --- Goal Value helpers (kept minimal and stable) ---
-// ... (dieser gesamte Abschnitt bleibt identisch...)
-
-function renderGoalValuePage() {
-  if (!goalValueContainer) return;
-  goalValueContainer.innerHTML = "";
-  const opponents = getGoalValueOpponents();
-  ensureGoalValueDataForSeason();
-  const goalData = getGoalValueData();
-  const bottom = getGoalValueBottom();
-  const playerNames = Object.keys(seasonData).length ? Object.keys(seasonData).sort() : selectedPlayers.map(p=>p.name);
-
-  // Strong left alignment for goal value
-  try {
-    goalValueContainer.style.display = 'flex';
-    goalValueContainer.style.justifyContent = 'flex-start';
-    goalValueContainer.style.paddingLeft = goalValueContainer.style.paddingLeft || '8px';
-  } catch (e) {}
-
-  const table = document.createElement("table");
-  table.className = "goalvalue-table";
-  table.style.width = table.style.width || "auto";
-  table.style.margin = "0";
-  table.style.borderCollapse = "collapse";
-  table.style.borderRadius = "8px";
-  table.style.overflow = "hidden";
-  table.style.tableLayout = "auto";
-
-  const thead = document.createElement("thead");
-  const headerRow = document.createElement("tr");
-
-  const thPlayer = document.createElement("th");
-  thPlayer.style.textAlign = "center";
-  thPlayer.style.padding = "8px 6px";
-  thPlayer.style.borderBottom = "2px solid #333";
-  thPlayer.style.minWidth = "160px";
-  thPlayer.style.whiteSpace = "nowrap";
-  thPlayer.textContent = "Spieler";
-  headerRow.appendChild(thPlayer);
-
-  opponents.forEach((op, idx) => {
-    const th = document.createElement("th");
-    th.style.padding = "6px";
-    th.style.borderBottom = "2px solid #333";
-    th.style.textAlign = "center";
-    const input = document.createElement("input");
-    input.type = "text";
-    input.value = op || `Gegner ${idx+1}`;
-    input.className = "goalvalue-title-input";
-    input.style.width = "100%";
-    input.style.boxSizing = "border-box";
-    input.style.textAlign = "center";
-    input.addEventListener("change", () => {
-      const arr = getGoalValueOpponents();
-      arr[idx] = input.value || `Gegner ${idx+1}`;
-      setGoalValueOpponents(arr);
-      ensureGoalValueDataForSeason();
-      renderGoalValuePage();
-    });
-    th.appendChild(input);
-    headerRow.appendChild(th);
-  });
-
-  const thValue = document.createElement("th");
-  thValue.style.padding = "6px";
-  thValue.style.borderBottom = "2px solid #333";
-  thValue.style.textAlign = "center";
-  thValue.textContent = "Value";
-  headerRow.appendChild(thValue);
-
-  thead.appendChild(headerRow);
-  table.appendChild(thead);
-
-  const tbody = document.createElement("tbody");
-  const valueCellMap = {};
-  const posColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-pos-color')?.trim() || "#00ff80";
-  const negColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-neg-color')?.trim() || "#ff4c4c";
-  const zeroColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
-
-  playerNames.forEach((name, rowIndex) => {
-    const row = document.createElement("tr");
-    row.classList.add(rowIndex % 2 === 0 ? "even-row" : "odd-row");
-    row.style.borderBottom = "1px solid #333";
-
-    const tdName = document.createElement("td");
-    tdName.textContent = name;
-    tdName.style.textAlign = "left";
-    tdName.style.padding = "6px";
-    tdName.style.fontWeight = "700";
-    tdName.style.minWidth = "160px";
-    tdName.style.whiteSpace = "nowrap";
-    tdName.style.overflow = "visible";
-    tdName.style.textOverflow = "clip";
-    row.appendChild(tdName);
-
-    const playerVals = (goalData[name] && Array.isArray(goalData[name])) ? goalData[name] : opponents.map(()=>0);
-    while (playerVals.length < opponents.length) playerVals.push(0);
-
-    opponents.forEach((op, idx) => {
-      const td = document.createElement("td");
-      td.style.padding = "6px";
-      td.style.textAlign = "center";
-      td.style.cursor = "pointer";
-      td.dataset.player = name;
-      td.dataset.opp = String(idx);
-      const cellVal = Number(playerVals[idx] || 0);
-      td.textContent = String(cellVal);
-
-      if (cellVal > 0) {
-        td.style.color = posColorGlobal;
-        td.style.fontWeight = "700";
-      } else if (cellVal < 0) {
-        td.style.color = negColorGlobal;
-        td.style.fontWeight = "400";
-      } else {
-        td.style.color = zeroColorGlobal;
-        td.style.fontWeight = "400";
-      }
-
-      let clickTimeout = null;
-      td.addEventListener("click", () => {
-        if (clickTimeout) clearTimeout(clickTimeout);
-        clickTimeout = setTimeout(() => {
-          const all = getGoalValueData();
-          if (!all[name]) all[name] = opponents.map(()=>0);
-          all[name][idx] = Math.max(0, (Number(all[name][idx]||0) + 1));
-          setGoalValueData(all);
-          td.textContent = String(all[name][idx]);
-          const nv = Number(all[name][idx] || 0);
-          if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
-          else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
-          else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
-
-          const valCell = valueCellMap[name];
-          if (valCell) {
-            const comp = computeValueForPlayer(name);
-            valCell.textContent = formatValueNumber(comp);
-            if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
-            else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
-            else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
+            lastTap = 0;
           }
-          clickTimeout = null;
-        }, 200);
-      });
-      td.addEventListener("dblclick", (e) => {
-        e.preventDefault();
-        if (clickTimeout) { clearTimeout(clickTimeout); clickTimeout = null; }
-        const all = getGoalValueData();
-        if (!all[name]) all[name] = opponents.map(()=>0);
-        all[name][idx] = Math.max(0, (Number(all[name][idx]||0) - 1));
-        setGoalValueData(all);
-        td.textContent = String(all[name][idx]);
-        const nv = Number(all[name][idx] || 0);
-        if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
-        else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
-        else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
+        }, 300);
+      }
+    }, { passive: true });
 
-        const valCell = valueCellMap[name];
-        if (valCell) {
-          const comp = computeValueForPlayer(name);
-          valCell.textContent = formatValueNumber(comp);
-          if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
-          else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
-          else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
-        }
-      });
-      row.appendChild(td);
-    });
-
-    // Value column
-    const tdValue = document.createElement("td");
-    const comp = computeValueForPlayer(name);
-    tdValue.textContent = formatValueNumber(comp);
-    tdValue.style.textAlign = "center";
-    if (comp > 0) { tdValue.style.color = posColorGlobal; tdValue.style.fontWeight = "700"; }
-    else if (comp < 0) { tdValue.style.color = negColorGlobal; tdValue.style.fontWeight = "400"; }
-    else { tdValue.style.color = zeroColorGlobal; tdValue.style.fontWeight = "400"; }
-    valueCellMap[name] = tdValue;
-    row.appendChild(tdValue);
-
-    tbody.appendChild(row);
+    row.appendChild(td);
   });
 
-  table.appendChild(tbody);
-  goalValueContainer.appendChild(table);
+  const tdValue = document.createElement("td");
+  tdValue.style.padding = "6px";
+  tdValue.style.textAlign = "center";
+  const computed = computeValueForPlayer(name);
+  tdValue.textContent = formatValueNumber(computed);
+  if (computed > 0) { tdValue.style.color = posColorGlobal; tdValue.style.fontWeight = "700"; }
+  else if (computed < 0) { tdValue.style.color = negColorGlobal; tdValue.style.fontWeight = "400"; }
+  else { tdValue.style.color = zeroColorGlobal; tdValue.style.fontWeight = "400"; }
+  row.appendChild(tdValue);
+  valueCellMap[name] = tdValue;
+
+  tbody.appendChild(row);
+});
+
+const bottomRow = document.createElement("tr");
+bottomRow.classList.add(playerNames.length % 2 === 0 ? "even-row" : "odd-row");
+bottomRow.style.background = "rgba(0,0,0,0.03)";
+const bottomLabel = document.createElement("td");
+bottomLabel.style.padding = "6px";
+bottomLabel.style.fontWeight = "700";
+bottomLabel.style.textAlign = "center";
+bottomLabel.textContent = "GegNER";
+bottomRow.appendChild(bottomLabel);
+
+const goalValueOptions = [];
+for (let v=0; v<=10; v++) goalValueOptions.push((v*0.5).toFixed(1));
+
+const bottomStored = getGoalValueBottom();
+while (bottomStored.length < opponents.length) bottomStored.push(0);
+if (bottomStored.length > opponents.length) bottomStored.length = opponents.length;
+setGoalValueBottom(bottomStored);
+
+opponents.forEach((op, idx) => {
+  const td = document.createElement("td");
+  td.style.padding = "6px";
+  td.style.textAlign = "center";
+  const sel = document.createElement("select");
+  sel.style.width = "80px";
+  goalValueOptions.forEach(opt => {
+    const o = document.createElement("option");
+    o.value = opt;
+    o.textContent = opt;
+    sel.appendChild(o);
+  });
+  const b = getGoalValueBottom();
+  if (b && typeof b[idx] !== "undefined") sel.value = String(b[idx]);
+  sel.addEventListener("change", () => {
+    const arr = getGoalValueBottom();
+    arr[idx] = Number(sel.value);
+    setGoalValueBottom(arr);
+    Object.keys(valueCellMap).forEach(playerName => {
+      const el = valueCellMap[playerName];
+      if (el) { 
+        const comp = computeValueForPlayer(playerName);
+        el.textContent = formatValueNumber(comp);
+        if (comp > 0) { el.style.color = posColorGlobal; el.style.fontWeight = "700"; }
+        else if (comp < 0) { el.style.color = negColorGlobal; el.style.fontWeight = "400"; }
+        else { el.style.color = zeroColorGlobal; el.style.fontWeight = "400"; }
+      }
+    });
+  });
+  td.appendChild(sel);
+  bottomRow.appendChild(td);
+});
+
+const tdEmptyForValue = document.createElement("td");
+tdEmptyForValue.style.padding = "6px";
+tdEmptyForValue.textContent = "";
+bottomRow.appendChild(tdEmptyForValue);
+
+tbody.appendChild(bottomRow);
+table.appendChild(tbody);
+
+// Wrap goalvalue table in scroll wrapper so all columns are accessible
+const wrapper = document.createElement('div');
+wrapper.className = 'table-scroll';
+wrapper.style.width = '100%';
+wrapper.style.boxSizing = 'border-box';
+wrapper.appendChild(table);
+
+goalValueContainer.appendChild(wrapper);
 }
 
-// ... Event Handler Enden wie gehabt
+function resetGoalValuePage() {
+  if (!confirm("⚠️ Goal Value zurücksetzen? Alle Spielerwerte auf 0 und Skalen auf 0 setzen.")) return;
+  const opponents = getGoalValueOpponents();
+  const playerNames = Object.keys(seasonData).length ? Object.keys(seasonData) : selectedPlayers.map(p=>p.name);
+  const newData = {};
+  playerNames.forEach(n => newData[n] = opponents.map(()=>0));
+  setGoalValueData(newData);
+  setGoalValueBottom(opponents.map(()=>0));
+  renderGoalValuePage();
+  alert("Goal Value zurückgezet.");
+}
 
-// Ende des DOMContentLoaded-Event-Händlers:
-}); // <- Die abschließende Klammer schließt das document.addEventListener(...)
+// --- Final init and restore state on load ---
+seasonData = JSON.parse(localStorage.getItem("seasonData")) || seasonData || {};
+
+renderPlayerSelection();
+
+const lastPage = localStorage.getItem("currentPage") || (selectedPlayers.length ? "stats" : "selection");
+if (lastPage === "stats") {
+  showPageRef("stats");
+  renderStatsTable();
+  updateIceTimeColors();
+} else if (lastPage === "season") {
+  showPageRef("season");
+  renderSeasonTable();
+} else if (lastPage === "seasonMap") {
+  showPageRef("seasonMap");
+  renderSeasonMapPage();
+} else if (lastPage === "goalValue") {
+  showPageRef("goalValue");
+  renderGoalValuePage();
+} else {
+  showPageRef("selection");
+}
+
+updateTimerDisplay();
+
+// Save to localStorage on unload
+window.addEventListener("beforeunload", () => {
+  try {
+    localStorage.setItem("statsData", JSON.stringify(statsData));
+    localStorage.setItem("selectedPlayers", JSON.stringify(selectedPlayers));
+    localStorage.setItem("playerTimes", JSON.stringify(playerTimes));
+    localStorage.setItem("timerSeconds", String(timerSeconds));
+    localStorage.setItem("seasonData", JSON.stringify(seasonData));
+    localStorage.setItem("goalValueOpponents", JSON.stringify(getGoalValueOpponents()));
+    localStorage.setItem("goalValueData", JSON.stringify(getGoalValueData()));
+    localStorage.setItem("goalValueBottom", JSON.stringify(getGoalValueBottom()));
+  } catch (e) {
+    // ignore
+  }
+});
+
+// Robust: zentrale Delegation für alle Back-Buttons (registriert sofort)
+document.addEventListener('click', function (e) {
+  try {
+    const btn = e.target.closest && e.target.closest('button');
+    if (!btn) return;
+    const id = btn.id || '';
+
+    const backButtonIds = new Set([
+      'backToStatsBtn',
+      'backToStatsFromSeasonBtn',
+      'backToStatsFromSeasonMapBtn',
+      'backFromGoalValueBtn'
+    ]);
+
+    if (backButtonIds.has(id)) {
+      if (typeof window.showPage === 'function') {
+        window.showPage('stats');
+      } else if (typeof showPageRef === 'function') {
+        showPageRef('stats');
+      } else if (typeof showPage === 'function') {
+        showPage('stats');
+      } else {
+        document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+        const statsP = document.getElementById('statsPage');
+        if (statsP) statsP.style.display = 'block';
+      }
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  } catch (err) {
+    console.warn('Back button delegation failed:', err);
+  }
+}, true);
+
+});
