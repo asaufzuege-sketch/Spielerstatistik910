@@ -223,8 +223,11 @@
   <div id="seasonPage" class="page" style="display:none;">
     <div class="page-top">
       <div class="top-bar">
+        <!-- Order: Zurück, Export CSV, Import CSV, Reset -->
         <button id="backToStatsFromSeasonBtn" class="top-btn">← Zurück</button>
         <button id="exportSeasonBtn" class="top-btn export-csv">Export CSV</button>
+        <!-- Include Import CSV here (app.js will not duplicate if it also tries to create it) -->
+        <button id="importCsvSeasonBtn" class="top-btn import-csv-btn">Import CSV</button>
         <button id="resetSeasonBtn" class="top-btn danger-btn reset-btn">Reset</button>
       </div>
     </div>
