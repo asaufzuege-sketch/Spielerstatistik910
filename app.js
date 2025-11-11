@@ -2929,4 +2929,32 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!confirm("⚠️ Goal Value zurücksetzen (alle Gegner & Werte)?")) return;
     try {
       localStorage.removeItem("goalValueData");
-      localStorage.removeItem("goalValueOpp
+      localStorage.removeItem("goalValueOpponents");
+      localStorage.removeItem("goalValueBottom");
+    } catch (e) {
+      console.warn("Error clearing goal value storage:", e);
+    }
+    try { renderGoalValuePage(); } catch (e) {}
+    try { renderSeasonTable(); } catch (e) {}
+    alert("Goal Value zurückgesetzt.");
+  }
+
+  // Ensure resetGoalValueBtn is properly wired (some DOMs attach earlier)
+  try {
+    resetGoalValueBtn?.removeEventListener?.("click", resetGoalValuePage);
+    resetGoalValueBtn?.addEventListener?.("click", resetGoalValuePage);
+  } catch (e) {}
+
+  // --- Initialization render calls (defensive) ---
+  try { renderPlayerSelection(); } catch (e) {}
+  try { renderStatsTable(); } catch (e) {}
+  try { renderSeasonTable(); } catch (e) {}
+  try { renderGoalValuePage(); } catch (e) {}
+
+  // show stored page if any
+  try {
+    const cur = localStorage.getItem("currentPage") || "selection";
+    showPage(cur);
+  } catch (e) {}
+
+}); // end DOMContentLoaded
