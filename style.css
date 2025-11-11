@@ -325,7 +325,7 @@ th .sort-arrow { font-size: 0.7rem; color: #ddd }
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%,-50%);
   box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
   border: 2px solid rgba(255, 255, 255, 0.15);
   cursor: pointer;
@@ -393,15 +393,14 @@ th .sort-arrow { font-size: 0.7rem; color: #ddd }
 
 /* Nr column narrow */
 #seasonPage thead th:nth-child(1), #seasonPage tbody td:nth-child(1) {
-  width: 48px;
-  min-width: 48px;
-  max-width: 48px;
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
   text-align: center;
 }
 
 /* Spieler column wider and keep full name visible */
 #seasonPage thead th:nth-child(2), #seasonPage tbody td:nth-child(2) {
-  min-width: 260px;
   text-align: left;
   white-space: nowrap; /* keep name in single line and force column width */
   font-weight: 700;
@@ -412,6 +411,14 @@ th .sort-arrow { font-size: 0.7rem; color: #ddd }
 #seasonPage tbody td:not(:nth-child(2)), #seasonPage thead th:not(:nth-child(2)) {
   text-align: center;
   white-space: nowrap;
+}
+
+/* Striped rows for season table */
+#seasonPage tbody tr:nth-child(odd) {
+  background-color: var(--row-odd);
+}
+#seasonPage tbody tr:nth-child(even) {
+  background-color: var(--row-even);
 }
 
 /* Total row styling */
