@@ -181,6 +181,12 @@ h1 {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Equal spacing specifically for Season page top-bar */
+#seasonPage .top-bar {
+  gap: 12px; /* exactly equal spacing between buttons on Season page */
+  justify-content: flex-start;
+}
+
 /* Base top button styling - uniform height; not bold (except reset) */
 .top-btn {
   background: #2b2b2b;
@@ -377,13 +383,41 @@ th .sort-arrow { font-size: 0.7rem; color: #ddd }
 /* =========================================
    SEASON PAGE & TOTAL ROW
    ========================================= */
-#seasonPage table { width: auto; table-layout: auto; border-collapse: collapse; font-size: 0.95rem; margin: 0 auto; }
+/* Make season table sit left and not centered; allow horizontal scrolling if needed */
+#seasonPage table { width: auto; table-layout: auto; border-collapse: collapse; font-size: 0.95rem; margin: 0; }
+
+/* Column sizing: Nr narrow, Spieler wider so full names show, values centered under headers */
 #seasonPage th, #seasonPage td { padding: 8px 6px; text-align: center; border-bottom: 1px solid #333; color: var(--text-color); white-space: nowrap; }
+
 #seasonPage thead th { background: var(--header-bg); position: sticky; top: 0; z-index: 40; padding: 8px 6px; border-bottom: 2px solid #333; text-align:center; }
-#seasonPage tr:nth-child(even) { background-color: var(--row-even); }
-#seasonPage tr:nth-child(odd) { background-color: var(--row-odd); }
+
+/* Nr column narrow */
+#seasonPage thead th:nth-child(1), #seasonPage tbody td:nth-child(1) {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  text-align: center;
+}
+
+/* Spieler column wider and keep full name visible */
+#seasonPage thead th:nth-child(2), #seasonPage tbody td:nth-child(2) {
+  min-width: 260px;
+  text-align: left;
+  white-space: nowrap; /* keep name in single line and force column width */
+  font-weight: 700;
+  padding-left: 12px;
+}
+
+/* All other value columns centered */
+#seasonPage tbody td:not(:nth-child(2)), #seasonPage thead th:not(:nth-child(2)) {
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Total row styling */
 #seasonPage .total-row td { background: var(--header-bg) !important; color: var(--text-color) !important; font-weight:700 !important; border-top:2px solid #333; }
 
+/* goalvalue input styling */
 .goalvalue-title-input {
   background: transparent;
   border: 1px solid rgba(255,255,255,0.08);
