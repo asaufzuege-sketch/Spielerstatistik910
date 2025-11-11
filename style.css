@@ -393,18 +393,20 @@ th .sort-arrow { font-size: 0.7rem; color: #ddd }
 
 /* Nr column narrow */
 #seasonPage thead th:nth-child(1), #seasonPage tbody td:nth-child(1) {
-  width: 36px;
-  min-width: 36px;
-  max-width: 36px;
+  width: 30px;
+  min-width: 30px;
+  max-width: 30px;
   text-align: center;
 }
 
-/* Spieler column wider and keep full name visible */
+/* Spieler column auto-adjust to longest name and keep full name visible */
 #seasonPage thead th:nth-child(2), #seasonPage tbody td:nth-child(2) {
   text-align: left;
   white-space: nowrap; /* keep name in single line and force column width */
   font-weight: 700;
   padding-left: 12px;
+  width: auto; /* auto-adjust to content */
+  min-width: fit-content; /* ensure it fits the longest name */
 }
 
 /* All other value columns centered */
@@ -414,10 +416,10 @@ th .sort-arrow { font-size: 0.7rem; color: #ddd }
 }
 
 /* Striped rows for season table */
-#seasonPage tbody tr:nth-child(odd) {
+#seasonPage tbody tr:nth-child(odd), #seasonPage tbody tr.odd-row {
   background-color: var(--row-odd);
 }
-#seasonPage tbody tr:nth-child(even) {
+#seasonPage tbody tr:nth-child(even), #seasonPage tbody tr.even-row {
   background-color: var(--row-even);
 }
 
