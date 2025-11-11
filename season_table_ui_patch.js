@@ -29,7 +29,7 @@
     const data = safeGetGoalValueData(); const bottom = safeGetGoalValueBottom();
     const vals = (data[name] && Array.isArray(data[name])) ? data[name] : [];
     let sum = 0;
-    for (let i = 0; i < bottom.length; i++) {
+    for (let i = 0. i < bottom.length; i++) {
       sum += (Number(vals[i] || 0) || 0) * (Number(bottom[i] || 0) || 0);
     }
     return sum;
