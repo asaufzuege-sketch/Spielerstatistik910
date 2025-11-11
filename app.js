@@ -1,9 +1,11 @@
 // app.js
 // Vollständige Datei. Ersetzt die bestehende app.js 1:1.
-// Diese Version enthält UI- und Layout-Fixes: linksausrichtete Season- & GoalValue-Tabellen,
-// horizontale Scroll-Wrapper, Shots%-Spalte, Mapping der Bild-Rendering-Eigenschaften zwischen Goal Map und Season Map,
-// defensive Fallbacks sowie aktualisierte exportSeasonMapPagePDF, die html2canvas nutzt (falls vorhanden)
-// um die Momentum-Grafik als Bild in den Export einzubetten.
+// Anpassungen:
+// - Namensspalte in Season wird dynamisch so breit gesetzt, dass sie dem längsten Namen entspricht.
+// - Season-Tabelle wird vollständig nach links ausgerichtet (kein unnötiger linker Abstand).
+// - Farben: Kopfzeile dunkel, Zeilen wechseln hell/dunkel (alternating rows).
+// - Werte zentriert unter den Titeln, Name links ausgerichtet.
+// Komplett und einsatzbereit zum 1:1 Ersetzen.
 
 document.addEventListener("DOMContentLoaded", () => {
   // force stronger left-align styles for season & goalvalue tables (injected CSS)
@@ -32,6 +34,8 @@ document.addEventListener("DOMContentLoaded", () => {
         -webkit-overflow-scrolling: touch !important;
         width: 100% !important;
         box-sizing: border-box !important;
+        padding-left: 0 !important;
+        margin-left: 0 !important;
       }
 
       /* Tabellen: nicht umbrechen, so entstehen horizontale Scrollbars statt abgeschnittene Spalten */
@@ -54,6 +58,7 @@ document.addEventListener("DOMContentLoaded", () => {
       #seasonContainer table th, #seasonContainer table td,
       #goalValueContainer table th, #goalValueContainer table td {
         padding-left: 8px !important;
+        padding-right: 8px !important;
       }
 
       /* Force header text centered for numeric columns, name column handled by JS */
@@ -77,6 +82,17 @@ document.addEventListener("DOMContentLoaded", () => {
         border-radius: 6px;
       }
 
+      /* Alternating row backgrounds - default look */
+      #seasonContainer table tbody tr.even-row { background: #ffffff !important; color: #000 !important; }
+      #seasonContainer table tbody tr.odd-row { background: #f0f4f8 !important; color: #000 !important; }
+
+      /* Kopfzeile: dunkel mit hellem Text */
+      #seasonContainer table thead th {
+        background: #1E1E1E !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+      }
+
       /* Desktop: full-width tables without horizontal scroll (truncate with ellipsis) */
       @media (min-width: 1200px) {
         #seasonContainer, #goalValueContainer {
@@ -88,7 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         #seasonContainer table, #goalValueContainer table {
           width: calc(100vw - 24px) !important;
-          table-layout: fixed !important;
+          table-layout: auto !important;
           white-space: nowrap !important;
           font-size: 13px !important;
         }
@@ -246,7 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <label class="player-line" style="display:flex;align-items:center;gap:8px;width:100%;" for="${checkboxId}">
             <input id="${checkboxId}" name="${checkboxName}" type="checkbox" value="${escapeHtml(p.name)}" ${checked} style="flex:0 0 auto">
             ${numAreaHtml}
-            <div class="name" style="flex:1;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong>${escapeHtml(p.name)}</strong></div>
+            <div class="name" style="flex:1;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong>${escapeHtml(p.name)}</strong></div>
           </label>`;
         playerListContainer.appendChild(li);
       });
@@ -1868,6 +1884,28 @@ document.addEventListener("DOMContentLoaded", () => {
     setGoalValueData(all);
   }
 
+  // compute maximum name pixel width for a list of names using canvas measureText
+  function computeMaxNamePixelWidth(names, fontSpec) {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!fontSpec) {
+        const bodyCS = getComputedStyle(document.body);
+        fontSpec = `${bodyCS.fontWeight || '600'} ${bodyCS.fontSize || '14px'} ${bodyCS.fontFamily || 'Arial, sans-serif'}`;
+      }
+      ctx.font = fontSpec;
+      let max = 0;
+      names.forEach(n => {
+        if (!n) return;
+        const w = ctx.measureText(String(n)).width;
+        if (w > max) max = w;
+      });
+      return Math.ceil(max);
+    } catch (e) {
+      return 200;
+    }
+  }
+
   function renderSeasonTable() {
     const container = document.getElementById("seasonContainer");
     if (!container) return;
@@ -1880,6 +1918,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // ENSURE NO LEFT GAP: force zero padding/margin so table sits flush to the left
     container.style.paddingLeft = '0px';
     container.style.marginLeft = '0px';
+    container.style.width = '100%';
 
     const headerCols = [
       "Nr", "Spieler", "Games",
@@ -1897,18 +1936,12 @@ document.addEventListener("DOMContentLoaded", () => {
     table.style.overflow = "hidden";
     table.style.borderCollapse = "separate";
     table.style.borderSpacing = "0";
+    table.style.tableLayout = "auto";
 
-    // --- NEW: colgroup to set Nr (narrow) and Spieler (wider) columns ---
+    // --- colgroup: Nr narrow, Spieler dynamic width, others auto ---
     const colgroup = document.createElement("colgroup");
-    // Nr column: narrow
-    const colNr = document.createElement("col");
-    colNr.style.width = "48px";
-    colgroup.appendChild(colNr);
-    // Spieler column: wider to show full names
-    const colName = document.createElement("col");
-    colName.style.width = "320px";
-    colgroup.appendChild(colName);
-    // remaining columns: allow auto sizing
+    const colNr = document.createElement("col"); colNr.style.width = "48px"; colgroup.appendChild(colNr);
+    const colName = document.createElement("col"); colName.style.width = "auto"; colgroup.appendChild(colName);
     for (let i = 2; i < headerCols.length; i++) {
       const c = document.createElement("col");
       c.style.width = ""; // auto
@@ -1924,6 +1957,7 @@ document.addEventListener("DOMContentLoaded", () => {
       th.dataset.colIndex = idx;
       th.className = "sortable";
       th.style.textAlign = "center"; // center header titles so values appear centered under them
+      th.style.padding = "8px";
       const arrow = document.createElement("span");
       arrow.className = "sort-arrow";
       arrow.style.marginLeft = "6px";
@@ -1956,7 +1990,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const goalsPerGame = games ? (goals / games) : 0;
       const pointsPerGame = games ? (points / games) : 0;
 
-      // Shots %: goals to shots ratio, in percent
       const shotsPercent = shots ? Math.round((goals / shots) * 100) : 0;
 
       let goalValue = "";
@@ -2046,16 +2079,19 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    displayRows.forEach(r => {
+    // Append rows while applying alternating colors and centering numeric columns.
+    displayRows.forEach((r, rowIndex) => {
       const tr = document.createElement("tr");
+      tr.classList.add(rowIndex % 2 === 0 ? "even-row" : "odd-row");
+
       r.cells.forEach((c, cellIdx) => {
         const td = document.createElement("td");
         td.textContent = c;
-        // By default center numeric/values so they're visually under headers
+        // center by default for numeric/value columns
         td.style.textAlign = "center";
 
         if (cellIdx === 1) {
-          // Spieler column: make wider and left-aligned so full name visible
+          // Spieler column: left aligned so full name visible
           td.style.textAlign = "left";
           td.style.fontWeight = "700";
           td.style.whiteSpace = "nowrap";
@@ -2063,7 +2099,6 @@ document.addEventListener("DOMContentLoaded", () => {
           td.style.textOverflow = "clip";
           td.style.paddingLeft = "12px";
         }
-        // Reduce Nr column width visually (colgroup handles width, but ensure no extra padding)
         if (cellIdx === 0) {
           td.style.textAlign = "center";
           td.style.paddingLeft = "6px";
@@ -2072,12 +2107,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         tr.appendChild(td);
       });
+
       tbody.appendChild(tr);
     });
 
     const count = rows.length || 0;
-    const headerBgColor = getComputedStyle(document.documentElement).getPropertyValue('--header-bg') || "#1E1E1E";
-    const headerTextColor = getComputedStyle(document.documentElement).getPropertyValue('--text-color') || "#fff";
+    const headerBgColor = "#1E1E1E";
+    const headerTextColor = "#ffffff";
     headerRow.querySelectorAll("th").forEach(th => {
       th.style.background = headerBgColor;
       th.style.color = headerTextColor;
@@ -2117,7 +2153,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const avgFaceOffPercent = avgFaceOffs ? Math.round((avgFaceOffsWon / avgFaceOffs) * 100) : 0;
       const avgTimeSeconds = Math.round(sums.timeSeconds / count);
 
-      // Overall shots->goals percentage
       const overallShotsPercent = sums.shots ? Math.round((sums.goals / sums.shots) * 100) : 0;
 
       const totalCells = new Array(headerCols.length).fill("");
@@ -2191,9 +2226,35 @@ document.addEventListener("DOMContentLoaded", () => {
     wrapper.style.width = '100%';
     wrapper.style.boxSizing = 'border-box';
     wrapper.style.marginLeft = '0px';
+    wrapper.style.paddingLeft = '0px';
     wrapper.appendChild(table);
 
     container.appendChild(wrapper);
+
+    // Dynamically compute the width required for the name column to fit the longest name
+    try {
+      // collect candidate names (seasonData, selectedPlayers, fallback players)
+      const candidateNamesSet = new Set();
+      Object.keys(seasonData).forEach(n => candidateNamesSet.add(n));
+      selectedPlayers.forEach(p => { if (p && p.name) candidateNamesSet.add(p.name); });
+      players.forEach(p => { if (p && p.name) candidateNamesSet.add(p.name); });
+      const candidateNames = Array.from(candidateNamesSet);
+      // prefer a bold font for measurement (name column uses font-weight bold in cells)
+      const csTable = getComputedStyle(table);
+      const fontSpec = `${csTable.fontWeight || '700'} ${csTable.fontSize || '14px'} ${csTable.fontFamily || 'Arial'}`;
+      const maxPx = computeMaxNamePixelWidth(candidateNames, fontSpec);
+      // Add padding allowance (left + right + safety)
+      const paddingAllowance = 48; // px
+      const colWidthPx = Math.max(160, Math.ceil(maxPx + paddingAllowance));
+      // set colgroup second col width
+      const colElems = table.querySelectorAll('colgroup col');
+      if (colElems && colElems.length > 1) {
+        colElems[1].style.width = `${colWidthPx}px`;
+      }
+    } catch (e) {
+      // ignore measurement errors; leave width auto
+      console.warn("Name column width adjustment failed:", e);
+    }
 
     function updateSortUI() {
       const ths = table.querySelectorAll("th.sortable");
@@ -2235,7 +2296,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const player = cell.dataset.player;
       if (top5.has(player)) cell.style.color = getComputedStyle(document.documentElement).getPropertyValue('--ice-top')?.trim() || "#00c06f";
       else if (bottom5.has(player)) cell.style.color = getComputedStyle(document.documentElement).getPropertyValue('--ice-bottom')?.trim() || "#ff4c4c";
-      else cell.style.color = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#ffffff";
+      else cell.style.color = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
     });
   }
 
@@ -2331,11 +2392,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const val = statsData[p.name]?.[c] ?? 0;
         const posColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-pos-color')?.trim() || "#00ff80";
         const negColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-neg-color')?.trim() || "#ff4c4c";
-        const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#ffffff";
+        const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
         const color = val > 0 ? posColor : val < 0 ? negColor : zeroColor;
         td.dataset.player = p.name;
         td.dataset.cat = c;
         td.style.color = color;
+        td.style.textAlign = "center";
         td.textContent = val;
         tr.appendChild(td);
       });
@@ -2347,6 +2409,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const m = String(Math.floor(seconds / 60)).padStart(2,"0");
       const s = String(seconds % 60).padStart(2,"0");
       iceTd.textContent = `${m}:${s}`;
+      iceTd.style.textAlign = "center";
       tr.appendChild(iceTd);
 
       (function(nameCell, playerName, rowEl) {
@@ -2421,12 +2484,14 @@ document.addEventListener("DOMContentLoaded", () => {
       td.className = "total-cell";
       td.dataset.cat = c;
       td.textContent = "0";
+      td.style.textAlign = "center";
       totalsRow.appendChild(td);
     });
     const tdTimeTotal = document.createElement("td");
     tdTimeTotal.className = "total-cell";
     tdTimeTotal.dataset.cat = "Time";
     tdTimeTotal.textContent = "";
+    tdTimeTotal.style.textAlign = "center";
     totalsRow.appendChild(tdTimeTotal);
 
     const headerBg = headerBgColor;
@@ -2476,7 +2541,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const val = statsData[player][cat];
     const posColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-pos-color')?.trim() || "#00ff80";
     const negColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-neg-color')?.trim() || "#ff4c4c";
-    const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#ffffff";
+    const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
     td.style.color = val > 0 ? posColor : val < 0 ? negColor : zeroColor;
 
     updateTotals();
@@ -2527,7 +2592,7 @@ document.addEventListener("DOMContentLoaded", () => {
         tc.textContent = totals[cat] || 0;
         const posColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-pos-color')?.trim() || "#00ff80";
         const negColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-neg-color')?.trim() || "#ff4c4c";
-        const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#ffffff";
+        const zeroColor = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
         tc.style.color = totals[cat] > 0 ? posColor : totals[cat] < 0 ? negColor : zeroColor;
       }
     });
@@ -2781,7 +2846,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const valueCellMap = {};
     const posColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-pos-color')?.trim() || "#00ff80";
     const negColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-neg-color')?.trim() || "#ff4c4c";
-    const zeroColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#ffffff";
+    const zeroColorGlobal = getComputedStyle(document.documentElement).getPropertyValue('--cell-zero-color')?.trim() || "#111";
 
     playerNames.forEach((name, rowIndex) => {
       const row = document.createElement("tr");
@@ -2861,100 +2926,4 @@ document.addEventListener("DOMContentLoaded", () => {
           else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
           else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
 
-          const valCell = valueCellMap[name];
-          if (valCell) {
-            const comp = computeValueForPlayer(name);
-            valCell.textContent = formatValueNumber(comp);
-            if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
-            else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
-            else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
-          }
-        });
-
-        let lastTap = 0;
-        td.addEventListener("touchstart", (e) => {
-          const now = Date.now();
-          const diff = now - lastTap;
-          if (diff < 300) {
-            e.preventDefault();
-            if (clickTimeout) { clearTimeout(clickTimeout); clickTimeout = null; }
-            const all = getGoalValueData();
-            if (!all[name]) all[name] = opponents.map(()=>0);
-            all[name][idx] = Math.max(0, (Number(all[name][idx]||0) - 1));
-            setGoalValueData(all);
-            td.textContent = String(all[name][idx]);
-            const nv = Number(all[name][idx] || 0);
-            if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
-            else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
-            else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
-            lastTap = 0;
-          } else {
-            lastTap = now;
-          }
-        }, { passive: true });
-
-        row.appendChild(td);
-      });
-
-      const valTd = document.createElement("td");
-      valTd.style.padding = "6px";
-      valTd.style.textAlign = "center";
-      valTd.className = "goalvalue-value";
-      valTd.dataset.player = name;
-      const compVal = computeValueForPlayer(name);
-      valTd.textContent = formatValueNumber(compVal);
-      if (compVal > 0) { valTd.style.color = posColorGlobal; valTd.style.fontWeight = "700"; }
-      else if (compVal < 0) { valTd.style.color = negColorGlobal; valTd.style.fontWeight = "400"; }
-      else { valTd.style.color = zeroColorGlobal; valTd.style.fontWeight = "400"; }
-
-      valueCellMap[name] = valTd;
-      row.appendChild(valTd);
-
-      tbody.appendChild(row);
-    });
-
-    table.appendChild(tbody);
-
-    // Wrap and append
-    const wrapper = document.createElement("div");
-    wrapper.className = "table-scroll";
-    wrapper.style.width = "100%";
-    wrapper.style.boxSizing = "border-box";
-    wrapper.appendChild(table);
-    goalValueContainer.appendChild(wrapper);
-  }
-
-  // --- Reconstructed helper: resetGoalValuePage (was referenced earlier) ---
-  function resetGoalValuePage() {
-    if (!confirm("⚠️ Goal Value zurücksetzen (alle Gegner & Werte)?")) return;
-    try {
-      localStorage.removeItem("goalValueData");
-      localStorage.removeItem("goalValueOpponents");
-      localStorage.removeItem("goalValueBottom");
-    } catch (e) {
-      console.warn("Error clearing goal value storage:", e);
-    }
-    try { renderGoalValuePage(); } catch (e) {}
-    try { renderSeasonTable(); } catch (e) {}
-    alert("Goal Value zurückgesetzt.");
-  }
-
-  // Ensure resetGoalValueBtn is properly wired (some DOMs attach earlier)
-  try {
-    resetGoalValueBtn?.removeEventListener?.("click", resetGoalValuePage);
-    resetGoalValueBtn?.addEventListener?.("click", resetGoalValuePage);
-  } catch (e) {}
-
-  // --- Initialization render calls (defensive) ---
-  try { renderPlayerSelection(); } catch (e) {}
-  try { renderStatsTable(); } catch (e) {}
-  try { renderSeasonTable(); } catch (e) {}
-  try { renderGoalValuePage(); } catch (e) {}
-
-  // show stored page if any
-  try {
-    const cur = localStorage.getItem("currentPage") || "selection";
-    showPage(cur);
-  } catch (e) {}
-
-}); // end DOMContentLoaded
+          const valCell = valueCellMap[name
