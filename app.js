@@ -234,7 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
           numAreaHtml = `<div class="num" style="flex:0 0 48px;text-align:center;"><strong>${escapeHtml(p.num)}</strong></div>`;
         } else {
           numAreaHtml = `<div style="flex:0 0 64px;text-align:center;">
-                           <input class="num-input" type="text" inputmode="numeric" maxlength="3" placeholder="Nr." value="" style="width:56px;padding:6px;border-radius:6px;border:1px solid #444;">
+                           <input class="num-input" type="text" inputmode="numeric" maxlength="3" placeholder="Nr." value="" style="width:56px;padding:6px;border-radius:6px;border:1px solid #444;[...]">
                          </div>`;
         }
 
@@ -257,8 +257,8 @@ document.addEventListener("DOMContentLoaded", () => {
       li.innerHTML = `
         <label class="custom-line" style="display:flex;align-items:center;gap:8px;width:100%;" for="${chkId}">
           <input id="${chkId}" name="${chkId}" type="checkbox" class="custom-checkbox" ${pre ? "checked" : ""} style="flex:0 0 auto">
-          <input id="${numId}" name="${numId}" type="text" class="custom-num" inputmode="numeric" maxlength="3" placeholder="Nr." value="${escapeHtml(pre?.num || "")}" style="width:56px;flex:0 0 auto;padding:6px;border-radius:6px;border:1px solid #444;">
-          <input id="${nameId}" name="${nameId}" type="text" class="custom-name" placeholder="Eigener Spielername" value="${escapeHtml(pre?.name || "")}" style="flex:1;min-width:0;border-radius:6px;padding:6px;border:1px solid #444;">
+          <input id="${numId}" name="${numId}" type="text" class="custom-num" inputmode="numeric" maxlength="3" placeholder="Nr." value="${escapeHtml(pre?.num || "")}" style="width:56px;flex:0 0 [...]">
+          <input id="${nameId}" name="${nameId}" type="text" class="custom-name" placeholder="Eigener Spielername" value="${escapeHtml(pre?.name || "")}" style="flex:1;min-width:0;border-radius:6[...]">
         </label>`;
       playerListContainer.appendChild(li);
     }
@@ -756,7 +756,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const clientX = (e.clientX !== undefined) ? e.clientX : (e.touches && e.touches[0] && e.touches[0].clientX);
         const clientY = (e.clientY !== undefined) ? e.clientY : (e.touches && e.touches[0] && e.touches[0].clientY);
 
-        // percent within container (box)
+        // percent innerhalb Container (Box)
         const xPctContainer = Math.max(0, Math.min(1, (clientX - boxRect.left) / (boxRect.width || 1))) * 100;
         const yPctContainer = Math.max(0, Math.min(1, (clientY - boxRect.top) / (boxRect.height || 1))) * 100;
 
@@ -1186,7 +1186,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await Promise.all(drawTasks);
 
-      // ---- NEW: try to render the momentum graphic as image (html2canvas preferred, canvas/img/svg/foreignObject fallback) ----
+      // Momentum / TimeData Einbettung
       const momentumEl = document.querySelector('#momentumTable, .momentum-table, #seasonMapMomentum, .season-map-momentum');
       const labelX = MARGIN;
       let labelY = CANVAS_H - MARGIN - 140;
@@ -1196,7 +1196,6 @@ document.addEventListener("DOMContentLoaded", () => {
       async function captureElementWithHtml2Canvas(el) {
         if (!window.html2canvas) return null;
         try {
-          // ensure element visible and has size
           const orig = { display: el.style.display || '', visibility: el.style.visibility || '', position: el.style.position || '' };
           const needsTempUnhide = (getComputedStyle(el).display === 'none');
           if (needsTempUnhide) {
@@ -1204,9 +1203,7 @@ document.addEventListener("DOMContentLoaded", () => {
             el.style.visibility = 'visible';
             el.style.position = 'relative';
           }
-
           const canvasCaptured = await window.html2canvas(el, { backgroundColor: null, useCORS: true, scale: 2 });
-
           if (needsTempUnhide) {
             el.style.display = orig.display;
             el.style.visibility = orig.visibility;
@@ -1221,7 +1218,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (momentumEl) {
         try {
-          // try html2canvas first (most robust)
           let mCanvas = null;
           try { mCanvas = await captureElementWithHtml2Canvas(momentumEl); } catch (e) { mCanvas = null; }
 
@@ -1235,7 +1231,6 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.drawImage(mCanvas, labelX, labelY, drawW, drawH);
             labelY += drawH + 10;
           } else {
-            // fallback to finding inner canvas/img/svg
             let drawn = false;
             try {
               const innerCanvas = momentumEl.querySelector('canvas');
@@ -1283,7 +1278,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (!drawn) {
-              // last fallback: render table/text as before
               const rows = Array.from(momentumEl.querySelectorAll('tr'));
               if (rows.length) {
                 ctx.fillText('Momentum:', labelX, labelY);
@@ -1312,7 +1306,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
         } catch (e) {
-          // best-effort fallback
           ctx.fillText('Momentum (konnte nicht als Bild exportiert werden):', labelX, labelY);
           labelY += 18;
           ctx.font = '14px Arial';
@@ -1327,7 +1320,6 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
       } else {
-        // no momentum element present -> fallback: render timeData as before
         ctx.fillText('Time Tracking (Season Map):', labelX, labelY);
         labelY += 22;
         const periods = Object.keys(timeData || {});
@@ -1363,7 +1355,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const pdf = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'portrait' });
       const pageWidthMm = 210;
       const pageHeightMm = 297;
-      const marginMm = 10; // 10 mm margins
+      const marginMm = 10;
       const drawWidthMm = pageWidthMm - 2 * marginMm;
       const canvasAspect = canvas.height / canvas.width;
       let drawHeightMm = drawWidthMm * canvasAspect;
@@ -1502,27 +1494,22 @@ document.addEventListener("DOMContentLoaded", () => {
       const torBoxes = Array.from(document.querySelectorAll(torbildBoxesSelector));
       boxes.forEach((seasonBox, idx) => {
         const seasonImg = seasonBox.querySelector('img');
-        // find corresponding torbild box (by index) and copy relevant render properties
         const torBox = torBoxes[idx];
         if (seasonImg && torBox) {
           const torImg = torBox.querySelector('img');
           if (torImg) {
             try {
-              // copy object-fit from torbild image so rendering/covering is identical
               const torCS = getComputedStyle(torImg);
               const torObjectFit = torCS.getPropertyValue('object-fit') || 'contain';
               seasonImg.style.objectFit = torObjectFit;
-              // copy width/height as computed sizes to ensure visual parity (use pixel values)
               const torRect = torImg.getBoundingClientRect();
               if (torRect && torRect.width && torRect.height) {
-                // Apply same client size to season image and its container so they appear identical
                 seasonImg.style.width = `${Math.round(torRect.width)}px`;
                 seasonImg.style.height = `${Math.round(torRect.height)}px`;
                 seasonBox.style.width = `${Math.round(torRect.width)}px`;
                 seasonBox.style.height = `${Math.round(torRect.height)}px`;
                 seasonBox.style.overflow = 'hidden';
               } else {
-                // fallback to 100% so it still fills the box
                 seasonImg.style.width = seasonImg.style.width || '100%';
                 seasonImg.style.height = seasonImg.style.height || '100%';
                 seasonBox.style.overflow = 'hidden';
@@ -1535,7 +1522,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
         } else {
-          // fallback: keep season images contained to their box
           const img = seasonBox.querySelector('img');
           if (img) {
             img.style.objectFit = img.style.objectFit || 'contain';
@@ -1759,7 +1745,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let seasonSort = { index: null, asc: true };
 
   function ensureGoalValueDataForSeason() {
-    // minimal stub: ensure structures exist
     const opponents = getGoalValueOpponents();
     const all = getGoalValueData();
     Object.keys(seasonData).forEach(name => {
@@ -1778,7 +1763,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!container) return;
     container.innerHTML = "";
 
-    // Stronger left alignment: use flex container and left justify
     container.style.display = 'flex';
     container.style.justifyContent = 'flex-start';
     container.style.alignItems = 'flex-start';
@@ -1795,7 +1779,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const table = document.createElement("table");
     table.className = "stats-table";
     table.style.width = table.style.width || "auto";
-    table.style.margin = "0"; // remove margin so it sits left
+    table.style.margin = "0";
     table.style.borderRadius = "8px";
     table.style.overflow = "hidden";
     table.style.borderCollapse = "separate";
@@ -1840,7 +1824,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const goalsPerGame = games ? (goals / games) : 0;
       const pointsPerGame = games ? (points / games) : 0;
 
-      // Shots %: goals to shots ratio, in percent
       const shotsPercent = shots ? Math.round((goals / shots) * 100) : 0;
 
       let goalValue = "";
@@ -1888,8 +1871,8 @@ document.addEventListener("DOMContentLoaded", () => {
         faceOffsWon,
         `${faceOffPercent}%`,
         formatTimeMMSS(timeSeconds),
-        "", // MVP placeholder
-        ""  // MVP Points placeholder
+        "",
+        ""
       ];
 
       return {
@@ -1985,7 +1968,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const avgFaceOffPercent = avgFaceOffs ? Math.round((avgFaceOffsWon / avgFaceOffs) * 100) : 0;
       const avgTimeSeconds = Math.round(sums.timeSeconds / count);
 
-      // Overall shots->goals percentage
       const overallShotsPercent = sums.shots ? Math.round((sums.goals / sums.shots) * 100) : 0;
 
       const totalCells = new Array(headerCols.length).fill("");
@@ -1996,11 +1978,11 @@ document.addEventListener("DOMContentLoaded", () => {
       totalCells[5] = Number((avgPoints).toFixed(1));
       totalCells[6] = Number((avgPlusMinus).toFixed(1));
       totalCells[7] = Number((avgPlusMinus).toFixed(1));
-      totalCells[8] = Number((avgShots).toFixed(1)); // Shots
-      totalCells[9] = Number((avgShots / (avgGames || 1)).toFixed(1)); // Shots/Game
-      totalCells[10] = `${overallShotsPercent}%`; // Shots %
-      totalCells[11] = Number((avgGoals / (avgGames || 1)).toFixed(1)); // Goals/Game
-      totalCells[12] = Number((avgPoints / (avgGames || 1)).toFixed(1)); // Points/Game
+      totalCells[8] = Number((avgShots).toFixed(1));
+      totalCells[9] = Number((avgShots / (avgGames || 1)).toFixed(1));
+      totalCells[10] = `${overallShotsPercent}%`;
+      totalCells[11] = Number((avgGoals / (avgGames || 1)).toFixed(1));
+      totalCells[12] = Number((avgPoints / (avgGames || 1)).toFixed(1));
       totalCells[13] = Number((avgPenalty).toFixed(1));
       totalCells[14] = "";
       totalCells[15] = Number((avgFaceOffs).toFixed(1));
@@ -2047,7 +2029,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     table.appendChild(tbody);
 
-    // Wrap the table in a horizontal scroll wrapper so all columns remain accessible
     const wrapper = document.createElement('div');
     wrapper.className = 'table-scroll';
     wrapper.style.width = '100%';
@@ -2268,7 +2249,6 @@ document.addEventListener("DOMContentLoaded", () => {
       tbody.appendChild(tr);
     });
 
-    // totals row
     const totalsRow = document.createElement("tr");
     totalsRow.id = "totalsRow";
     const tdEmpty = document.createElement("td"); tdEmpty.textContent = "";
@@ -2324,7 +2304,6 @@ document.addEventListener("DOMContentLoaded", () => {
     updateTotals();
   }
 
-  // --- change value helper ---
   function changeValue(td, delta) {
     const player = td.dataset.player;
     const cat = td.dataset.cat;
@@ -2343,7 +2322,6 @@ document.addEventListener("DOMContentLoaded", () => {
     updateTotals();
   }
 
-  // --- update totals ---
   function updateTotals() {
     const totals = {};
     categories.forEach(c => totals[c] = 0);
@@ -2466,7 +2444,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("resetTorbildBtn")?.addEventListener("click", resetTorbildPage);
   document.getElementById("resetSeasonBtn")?.addEventListener("click", resetSeasonPage);
 
-  // --- Pages navigation --- (use showPageRef to keep previous API)
+  // --- Pages navigation ---
   function showPageFull(page) {
     Object.values(pages).forEach(p => { if (p) p.style.display = "none"; });
     if (pages[page]) pages[page].style.display = "block";
@@ -2499,7 +2477,6 @@ document.addEventListener("DOMContentLoaded", () => {
   backFromGoalValueBtn?.addEventListener("click", () => showPageRef("stats"));
   resetGoalValueBtn?.addEventListener("click", resetGoalValuePage);
 
-  // --- Fix: missing navigation handlers ---
   torbildBtn?.addEventListener("click", () => {
     try {
       showPageRef("torbild");
@@ -2521,7 +2498,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // --- Goal Value helpers (kept minimal and stable) ---
+  // --- Goal Value helpers ---
   function getGoalValueOpponents() {
     try {
       const raw = localStorage.getItem("goalValueOpponents");
@@ -2577,7 +2554,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const bottom = getGoalValueBottom();
     const playerNames = Object.keys(seasonData).length ? Object.keys(seasonData).sort() : selectedPlayers.map(p=>p.name);
 
-    // Strong left alignment for goal value
     try {
       goalValueContainer.style.display = 'flex';
       goalValueContainer.style.justifyContent = 'flex-start';
@@ -2841,13 +2817,13 @@ document.addEventListener("DOMContentLoaded", () => {
         setGoalValueBottom(arr);
         Object.keys(valueCellMap).forEach(playerName => {
           const el = valueCellMap[playerName];
-          if (el) { 
-            const comp = computeValueForPlayer(playerName);
-            el.textContent = formatValueNumber(comp);
-            if (comp > 0) { el.style.color = posColorGlobal; el.style.fontWeight = "700"; }
-            else if (comp < 0) { el.style.color = negColorGlobal; el.style.fontWeight = "400"; }
-            else { el.style.color = zeroColorGlobal; el.style.fontWeight = "400"; }
-          }
+            if (el) { 
+              const comp = computeValueForPlayer(playerName);
+              el.textContent = formatValueNumber(comp);
+              if (comp > 0) { el.style.color = posColorGlobal; el.style.fontWeight = "700"; }
+              else if (comp < 0) { el.style.color = negColorGlobal; el.style.fontWeight = "400"; }
+              else { el.style.color = zeroColorGlobal; el.style.fontWeight = "400"; }
+            }
         });
       });
       td.appendChild(sel);
@@ -2862,7 +2838,6 @@ document.addEventListener("DOMContentLoaded", () => {
     tbody.appendChild(bottomRow);
     table.appendChild(tbody);
 
-    // Wrap goalvalue table in scroll wrapper so all columns are accessible
     const wrapper = document.createElement('div');
     wrapper.className = 'table-scroll';
     wrapper.style.width = '100%';
@@ -2909,7 +2884,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   updateTimerDisplay();
 
-  // Save to localStorage on unload
   window.addEventListener("beforeunload", () => {
     try {
       localStorage.setItem("statsData", JSON.stringify(statsData));
@@ -2920,12 +2894,9 @@ document.addEventListener("DOMContentLoaded", () => {
       localStorage.setItem("goalValueOpponents", JSON.stringify(getGoalValueOpponents()));
       localStorage.setItem("goalValueData", JSON.stringify(getGoalValueData()));
       localStorage.setItem("goalValueBottom", JSON.stringify(getGoalValueBottom()));
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   });
 
-  // Robust: zentrale Delegation für alle Back-Buttons (registriert sofort)
   document.addEventListener('click', function (e) {
     try {
       const btn = e.target.closest && e.target.closest('button');
