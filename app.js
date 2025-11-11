@@ -234,7 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
           numAreaHtml = `<div class="num" style="flex:0 0 48px;text-align:center;"><strong>${escapeHtml(p.num)}</strong></div>`;
         } else {
           numAreaHtml = `<div style="flex:0 0 64px;text-align:center;">
-                           <input class="num-input" type="text" inputmode="numeric" maxlength="3" placeholder="Nr." value="" style="width:56px;padding:6px;border-radius:6px;border:1px solid #444;[...] 
+                           <input class="num-input" type="text" inputmode="numeric" maxlength="3" placeholder="Nr." value="" style="width:56px;padding:6px;border-radius:6px;border:1px solid #444;">
                           </div>`;
         }
 
@@ -257,8 +257,8 @@ document.addEventListener("DOMContentLoaded", () => {
       li.innerHTML = `
         <label class="custom-line" style="display:flex;align-items:center;gap:8px;width:100%;" for="${chkId}">
           <input id="${chkId}" name="${chkId}" type="checkbox" class="custom-checkbox" ${pre ? "checked" : ""} style="flex:0 0 auto">
-          <input id="${numId}" name="${numId}" type="text" class="custom-num" inputmode="numeric" maxlength="3" placeholder="Nr." value="${escapeHtml(pre?.num || "")}" style="width:56px;flex:0 0 [...] 
-          <input id="${nameId}" name="${nameId}" type="text" class="custom-name" placeholder="Eigener Spielername" value="${escapeHtml(pre?.name || "")}" style="flex:1;min-width:0;border-radius:6[...] 
+          <input id="${numId}" name="${numId}" type="text" class="custom-num" inputmode="numeric" maxlength="3" placeholder="Nr." value="${escapeHtml(pre?.num || "")}" style="width:56px;flex:0 0 56px;padding:6px;border-radius:6px;border:1px solid #444;">
+          <input id="${nameId}" name="${nameId}" type="text" class="custom-name" placeholder="Eigener Spielername" value="${escapeHtml(pre?.name || "")}" style="flex:1;min-width:0;border-radius:6px;padding:6px;border:1px solid #444;">
         </label>`;
       playerListContainer.appendChild(li);
     }
@@ -2838,4 +2838,75 @@ document.addEventListener("DOMContentLoaded", () => {
             const nv = Number(all[name][idx] || 0);
             if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
             else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
-            else { td
+            else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
+            lastTap = 0;
+          } else {
+            lastTap = now;
+          }
+        }, { passive: true });
+
+        row.appendChild(td);
+      });
+
+      const valTd = document.createElement("td");
+      valTd.style.padding = "6px";
+      valTd.style.textAlign = "center";
+      valTd.className = "goalvalue-value";
+      valTd.dataset.player = name;
+      const comp = computeValueForPlayer(name);
+      valTd.textContent = formatValueNumber(comp);
+      if (comp > 0) { valTd.style.color = posColorGlobal; valTd.style.fontWeight = "700"; }
+      else if (comp < 0) { valTd.style.color = negColorGlobal; valTd.style.fontWeight = "400"; }
+      else { valTd.style.color = zeroColorGlobal; valTd.style.fontWeight = "400"; }
+
+      valueCellMap[name] = valTd;
+      row.appendChild(valTd);
+
+      tbody.appendChild(row);
+    });
+
+    table.appendChild(tbody);
+
+    // Wrap and append
+    const wrapper = document.createElement("div");
+    wrapper.className = "table-scroll";
+    wrapper.style.width = "100%";
+    wrapper.style.boxSizing = "border-box";
+    wrapper.appendChild(table);
+    goalValueContainer.appendChild(wrapper);
+  }
+
+  // --- Reconstructed helper: resetGoalValuePage (was referenced earlier) ---
+  function resetGoalValuePage() {
+    if (!confirm("⚠️ Goal Value zurücksetzen (alle Gegner & Werte)?")) return;
+    try {
+      localStorage.removeItem("goalValueData");
+      localStorage.removeItem("goalValueOpponents");
+      localStorage.removeItem("goalValueBottom");
+    } catch (e) {
+      console.warn("Error clearing goal value storage:", e);
+    }
+    try { renderGoalValuePage(); } catch (e) {}
+    try { renderSeasonTable(); } catch (e) {}
+    alert("Goal Value zurückgesetzt.");
+  }
+
+  // Ensure resetGoalValueBtn is properly wired (some DOMs attach earlier)
+  try {
+    resetGoalValueBtn?.removeEventListener?.("click", resetGoalValuePage);
+    resetGoalValueBtn?.addEventListener?.("click", resetGoalValuePage);
+  } catch (e) {}
+
+  // --- Initialization render calls (defensive) ---
+  try { renderPlayerSelection(); } catch (e) {}
+  try { renderStatsTable(); } catch (e) {}
+  try { renderSeasonTable(); } catch (e) {}
+  try { renderGoalValuePage(); } catch (e) {}
+
+  // show stored page if any
+  try {
+    const cur = localStorage.getItem("currentPage") || "selection";
+    showPage(cur);
+  } catch (e) {}
+
+}); // end DOMContentLoaded
