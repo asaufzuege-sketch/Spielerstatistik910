@@ -1,11 +1,9 @@
 // app.js
 // Vollständige Datei. Ersetzt die bestehende app.js 1:1.
-// Diese Version übernimmt die Season-Export-Regeln aus Repro 910:
-// - Season-Tabelle: linker Rand ohne Abstand, Header zentriert, Werte zentriert, Name links
-// - Dynamische Namensspaltenbreite (passt sich dem längsten Namen an)
-// - Shots Total im Stats-CSV: "eigene vs gegner" (liest Gegner-Schüsse aus der Totals-Zeile)
-// - Alternierende Zeilenfarben in Season für bessere Lesbarkeit
-// - Beibehalt aller bestehenden 909-Features (Season Map Export, Goal Value, etc.)
+// Diese Version enthält UI- und Layout-Fixes: linksausrichtete Season- & GoalValue-Tabellen,
+// horizontale Scroll-Wrapper, Shots%-Spalte, Mapping der Bild-Rendering-Eigenschaften zwischen Goal Map und Season Map,
+// defensive Fallbacks sowie aktualisierte exportSeasonMapPagePDF, die html2canvas nutzt (falls vorhanden)
+// um die Momentum-Grafik als Bild in den Export einzubetten.
 
 document.addEventListener("DOMContentLoaded", () => {
   // force stronger left-align styles for season & goalvalue tables (injected CSS)
@@ -34,8 +32,6 @@ document.addEventListener("DOMContentLoaded", () => {
         -webkit-overflow-scrolling: touch !important;
         width: 100% !important;
         box-sizing: border-box !important;
-        padding-left: 0 !important;
-        margin-left: 0 !important;
       }
 
       /* Tabellen: nicht umbrechen, so entstehen horizontale Scrollbars statt abgeschnittene Spalten */
@@ -54,16 +50,18 @@ document.addEventListener("DOMContentLoaded", () => {
         margin-left: 0 !important;
       }
 
-      /* Zellen: nur Padding setzen, Text-Ausrichtung wird per JS/Inline-Stil gesteuert */
+      /* Zellen links ausrichten, für bessere Lesbarkeit bei vielen Spalten */
       #seasonContainer table th, #seasonContainer table td,
       #goalValueContainer table th, #goalValueContainer table td {
+        text-align: left !important;
         padding-left: 8px !important;
-        padding-right: 8px !important;
       }
 
-      /* Header in Season: Titel zentriert (Werte darunter ebenfalls zentriert) */
-      #seasonContainer table thead th {
-        text-align: center !important;
+      /* Falls die Seite einen globalen content-wrapper hat, der Zentrierung erzwingt,
+         entferne dessen horizontale padding/margin innerhalb der beiden Seiten */
+      #seasonPage .content-wrapper, #goalValuePage .content-wrapper {
+        padding-left: 0 !important;
+        margin-left: 0 !important;
       }
 
       /* Optional: kleine Pfeile für sichtbarere Scrollbar auf Desktop */
@@ -75,11 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
         border-radius: 6px;
       }
 
-      /* Alternierende Zeilenfarben in Season */
-      #seasonContainer table tbody tr.even-row { background: #ffffff !important; color: #000; }
-      #seasonContainer table tbody tr.odd-row  { background: #f0f4f8 !important; color: #000; }
-
-      /* Desktop: full-width tables; ellipsis bei Überlauf */
+      /* Desktop: full-width tables without horizontal scroll (truncate with ellipsis) */
       @media (min-width: 1200px) {
         #seasonContainer, #goalValueContainer {
           width: 100vw !important;
@@ -90,7 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         #seasonContainer table, #goalValueContainer table {
           width: calc(100vw - 24px) !important;
-          table-layout: auto !important;
+          table-layout: fixed !important;
           white-space: nowrap !important;
           font-size: 13px !important;
         }
@@ -241,7 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
           numAreaHtml = `<div style="flex:0 0 64px;text-align:center;">
                            <input class="num-input" type="text" inputmode="numeric" maxlength="3" placeholder="Nr." value="" style="width:56px;padding:6px;border-radius:6px;border:1px solid #444;">
-                          </div>`;
+                         </div>`;
         }
 
         li.innerHTML = `
@@ -263,7 +257,7 @@ document.addEventListener("DOMContentLoaded", () => {
       li.innerHTML = `
         <label class="custom-line" style="display:flex;align-items:center;gap:8px;width:100%;" for="${chkId}">
           <input id="${chkId}" name="${chkId}" type="checkbox" class="custom-checkbox" ${pre ? "checked" : ""} style="flex:0 0 auto">
-          <input id="${numId}" name="${numId}" type="text" class="custom-num" inputmode="numeric" maxlength="3" placeholder="Nr." value="${escapeHtml(pre?.num || "")}" style="width:56px;flex:0 0 56px;border-radius:6px;padding:6px;border:1px solid #444;">
+          <input id="${numId}" name="${numId}" type="text" class="custom-num" inputmode="numeric" maxlength="3" placeholder="Nr." value="${escapeHtml(pre?.num || "")}" style="width:56px;flex:0 0 auto;padding:6px;border-radius:6px;border:1px solid #444;">
           <input id="${nameId}" name="${nameId}" type="text" class="custom-name" placeholder="Eigener Spielername" value="${escapeHtml(pre?.name || "")}" style="flex:1;min-width:0;border-radius:6px;padding:6px;border:1px solid #444;">
         </label>`;
       playerListContainer.appendChild(li);
@@ -1192,7 +1186,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await Promise.all(drawTasks);
 
-      // ---- try to render the momentum graphic as image (html2canvas preferred, canvas/img/svg fallback) ----
+      // ---- NEW: try to render the momentum graphic as image (html2canvas preferred, canvas/img/svg/foreignObject fallback) ----
       const momentumEl = document.querySelector('#momentumTable, .momentum-table, #seasonMapMomentum, .season-map-momentum');
       const labelX = MARGIN;
       let labelY = CANVAS_H - MARGIN - 140;
@@ -1708,18 +1702,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const totalRow = new Array(header.length).fill("");
       totalRow[1] = `Total (${selectedPlayers.length})`;
-
-      // Season-Export-Regel aus 910: Shots in Total = "eigene vs gegner"
-      const ownShots = totals["Shot"] || 0;
-      const oppShots = Number(document.querySelector(".total-cell[data-cat='Shot']")?.dataset.opp || 0);
-      // Shots-Spalte liegt direkt nach "Spieler" -> Index 2
-      totalRow[2] = `${ownShots} vs ${oppShots}`;
-
       categories.forEach((c, idx) => {
         const colIndex = 2 + idx;
-        if (c === "Shot") {
-          // bereits gesetzt als "own vs opp"
-        } else if (c === "+/-") {
+        if (c === "+/-") {
           const vals = selectedPlayers.map(p => Number(statsData[p.name]?.[c] || 0));
           const avg = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
           totalRow[colIndex] = `Ø ${avg}`;
@@ -1731,7 +1716,6 @@ document.addEventListener("DOMContentLoaded", () => {
           totalRow[colIndex] = String(totals[c] || 0);
         }
       });
-
       totalRow[header.length - 1] = formatTimeMMSS(totalSeconds);
       rows.push(totalRow);
 
@@ -1755,7 +1739,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("exportBtn")?.addEventListener("click", exportStatsCSV);
 
-  // --- Season table rendering helpers ---
+  // --- Season table rendering ---
   function parseForSort(val) {
     if (val === null || val === undefined) return "";
     const v = String(val).trim();
@@ -1789,40 +1773,16 @@ document.addEventListener("DOMContentLoaded", () => {
     setGoalValueData(all);
   }
 
-  // compute maximum name pixel width for a list of names using canvas measureText
-  function computeMaxNamePixelWidth(names, fontSpec) {
-    try {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!fontSpec) {
-        const bodyCS = getComputedStyle(document.body);
-        fontSpec = `${bodyCS.fontWeight || '700'} ${bodyCS.fontSize || '14px'} ${bodyCS.fontFamily || 'Arial, sans-serif'}`;
-      }
-      ctx.font = fontSpec;
-      let max = 0;
-      names.forEach(n => {
-        if (!n) return;
-        const w = ctx.measureText(String(n)).width;
-        if (w > max) max = w;
-      });
-      return Math.ceil(max);
-    } catch (e) {
-      return 200;
-    }
-  }
-
   function renderSeasonTable() {
     const container = document.getElementById("seasonContainer");
     if (!container) return;
     container.innerHTML = "";
 
-    // Stronger left alignment: use flex container and left justify; kein linker Abstand
+    // Stronger left alignment: use flex container and left justify
     container.style.display = 'flex';
     container.style.justifyContent = 'flex-start';
     container.style.alignItems = 'flex-start';
-    container.style.paddingLeft = '0px';
-    container.style.marginLeft = '0px';
-    container.style.width = '100%';
+    container.style.paddingLeft = container.style.paddingLeft || '8px';
 
     const headerCols = [
       "Nr", "Spieler", "Games",
@@ -1840,18 +1800,6 @@ document.addEventListener("DOMContentLoaded", () => {
     table.style.overflow = "hidden";
     table.style.borderCollapse = "separate";
     table.style.borderSpacing = "0";
-    table.style.tableLayout = "auto";
-
-    // --- colgroup: Nr fix, Spieler dynamisch, rest auto ---
-    const colgroup = document.createElement("colgroup");
-    const colNr = document.createElement("col"); colNr.style.width = "48px"; colgroup.appendChild(colNr);
-    const colName = document.createElement("col"); colName.style.width = "auto"; colgroup.appendChild(colName);
-    for (let i = 2; i < headerCols.length; i++) {
-      const c = document.createElement("col");
-      c.style.width = ""; // auto
-      colgroup.appendChild(c);
-    }
-    table.appendChild(colgroup);
 
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
@@ -1860,8 +1808,6 @@ document.addEventListener("DOMContentLoaded", () => {
       th.textContent = h;
       th.dataset.colIndex = idx;
       th.className = "sortable";
-      th.style.textAlign = "center";
-      th.style.padding = "8px";
       const arrow = document.createElement("span");
       arrow.className = "sort-arrow";
       arrow.style.marginLeft = "6px";
@@ -1984,31 +1930,14 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // Append rows: alternierende Farben, Werte zentriert, Name links
-    displayRows.forEach((r, rowIndex) => {
+    displayRows.forEach(r => {
       const tr = document.createElement("tr");
-      tr.classList.add(rowIndex % 2 === 0 ? "even-row" : "odd-row");
       r.cells.forEach((c, cellIdx) => {
         const td = document.createElement("td");
         td.textContent = c;
-
-        // Standard: Wertspalten zentrieren
-        td.style.textAlign = "center";
-
-        // Spieler-Spalte links, fett, ohne Trunkierung
         if (cellIdx === 1) {
           td.style.textAlign = "left";
           td.style.fontWeight = "700";
-          td.style.whiteSpace = "nowrap";
-          td.style.overflow = "visible";
-          td.style.textOverflow = "clip";
-          td.style.paddingLeft = "12px";
-        }
-        // Nr-Spalte kompakt zentriert
-        if (cellIdx === 0) {
-          td.style.textAlign = "center";
-          td.style.paddingLeft = "6px";
-          td.style.paddingRight = "6px";
         }
         tr.appendChild(td);
       });
@@ -2023,7 +1952,6 @@ document.addEventListener("DOMContentLoaded", () => {
       th.style.color = headerTextColor;
       th.style.fontWeight = "700";
       th.style.padding = "8px";
-      th.style.textAlign = "center";
     });
 
     if (count > 0) {
@@ -2088,9 +2016,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (idx === 1) {
           td.style.textAlign = "left";
           td.style.fontWeight = "700";
-          td.style.paddingLeft = "12px";
-        } else {
-          td.style.textAlign = "center";
         }
         td.style.background = headerBgColor;
         td.style.color = headerTextColor;
@@ -2110,9 +2035,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (idx === 1) {
           td.style.textAlign = "left";
           td.style.fontWeight = "700";
-          td.style.paddingLeft = "12px";
-        } else {
-          td.style.textAlign = "center";
         }
         td.style.background = headerBgColor;
         td.style.color = headerTextColor;
@@ -2130,31 +2052,9 @@ document.addEventListener("DOMContentLoaded", () => {
     wrapper.className = 'table-scroll';
     wrapper.style.width = '100%';
     wrapper.style.boxSizing = 'border-box';
-    wrapper.style.marginLeft = '0px';
-    wrapper.style.paddingLeft = '0px';
     wrapper.appendChild(table);
 
     container.appendChild(wrapper);
-
-    // Dynamisch: Breite der Namensspalte an längsten Namen anpassen
-    try {
-      const candidateNamesSet = new Set();
-      Object.keys(seasonData).forEach(n => candidateNamesSet.add(n));
-      selectedPlayers.forEach(p => { if (p && p.name) candidateNamesSet.add(p.name); });
-      players.forEach(p => { if (p && p.name) candidateNamesSet.add(p.name); });
-      const candidateNames = Array.from(candidateNamesSet);
-      const csTable = getComputedStyle(table);
-      const fontSpec = `${csTable.fontWeight || '700'} ${csTable.fontSize || '14px'} ${csTable.fontFamily || 'Arial'}`;
-      const maxPx = computeMaxNamePixelWidth(candidateNames, fontSpec);
-      const paddingAllowance = 48; // px: links+rechts+safety
-      const colWidthPx = Math.max(160, Math.ceil(maxPx + paddingAllowance));
-      const colElems = table.querySelectorAll('colgroup col');
-      if (colElems && colElems.length > 1) {
-        colElems[1].style.width = `${colWidthPx}px`;
-      }
-    } catch (e) {
-      console.warn("Name column width adjustment failed:", e);
-    }
 
     function updateSortUI() {
       const ths = table.querySelectorAll("th.sortable");
@@ -2793,13 +2693,64 @@ document.addEventListener("DOMContentLoaded", () => {
             all[name][idx] = Math.max(0, (Number(all[name][idx]||0) + 1));
             setGoalValueData(all);
             td.textContent = String(all[name][idx]);
-                       const nv = Number(all[name][idx] || 0);
+            const nv = Number(all[name][idx] || 0);
             if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
             else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
             else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
 
             const valCell = valueCellMap[name];
-            if (valCell) { 
+            if (valCell) {
+              const comp = computeValueForPlayer(name);
+              valCell.textContent = formatValueNumber(comp);
+              if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
+              else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
+              else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
+            }
+            clickTimeout = null;
+          }, 200);
+        });
+        td.addEventListener("dblclick", (e) => {
+          e.preventDefault();
+          if (clickTimeout) { clearTimeout(clickTimeout); clickTimeout = null; }
+          const all = getGoalValueData();
+          if (!all[name]) all[name] = opponents.map(()=>0);
+          all[name][idx] = Math.max(0, (Number(all[name][idx]||0) - 1));
+          setGoalValueData(all);
+          td.textContent = String(all[name][idx]);
+          const nv = Number(all[name][idx] || 0);
+          if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
+          else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
+          else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
+
+          const valCell = valueCellMap[name];
+          if (valCell) {
+            const comp = computeValueForPlayer(name);
+            valCell.textContent = formatValueNumber(comp);
+            if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
+            else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
+            else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
+          }
+        });
+
+        let lastTap = 0;
+        td.addEventListener("touchstart", (e) => {
+          const now = Date.now();
+          const diff = now - lastTap;
+          if (diff < 300) {
+            e.preventDefault();
+            if (clickTimeout) { clearTimeout(clickTimeout); clickTimeout = null; }
+            const all = getGoalValueData();
+            if (!all[name]) all[name] = opponents.map(()=>0);
+            all[name][idx] = Math.max(0, (Number(all[name][idx]||0) - 1));
+            setGoalValueData(all);
+            td.textContent = String(all[name][idx]);
+            const nv = Number(all[name][idx] || 0);
+            if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
+            else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
+            else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
+
+            const valCell = valueCellMap[name];
+            if (valCell) {
               const comp = computeValueForPlayer(name);
               valCell.textContent = formatValueNumber(comp);
               if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
@@ -2807,182 +2758,205 @@ document.addEventListener("DOMContentLoaded", () => {
               else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
             }
             lastTap = 0;
+          } else {
+            lastTap = now;
+            setTimeout(() => {
+              if (lastTap !== 0) {
+                const all = getGoalValueData();
+                if (!all[name]) all[name] = opponents.map(()=>0);
+                all[name][idx] = Math.max(0, (Number(all[name][idx]||0) + 1));
+                setGoalValueData(all);
+                td.textContent = String(all[name][idx]);
+                const nv = Number(all[name][idx] || 0);
+                if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
+                else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
+                else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
+
+                const valCell = valueCellMap[name];
+                if (valCell) { 
+                  const comp = computeValueForPlayer(name);
+                  valCell.textContent = formatValueNumber(comp);
+                  if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
+                  else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
+                  else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
+                }
+                lastTap = 0;
+              }
+            }, 300);
           }
-        }, 300);
-      }
-    }, { passive: true });
+        }, { passive: true });
 
-    row.appendChild(td);
-  });
+        row.appendChild(td);
+      });
 
-  const tdValue = document.createElement("td");
-  tdValue.style.padding = "6px";
-  tdValue.style.textAlign = "center";
-  const computed = computeValueForPlayer(name);
-  tdValue.textContent = formatValueNumber(computed);
-  if (computed > 0) { tdValue.style.color = posColorGlobal; tdValue.style.fontWeight = "700"; }
-  else if (computed < 0) { tdValue.style.color = negColorGlobal; tdValue.style.fontWeight = "400"; }
-  else { tdValue.style.color = zeroColorGlobal; tdValue.style.fontWeight = "400"; }
-  row.appendChild(tdValue);
-  valueCellMap[name] = tdValue;
+      const tdValue = document.createElement("td");
+      tdValue.style.padding = "6px";
+      tdValue.style.textAlign = "center";
+      const computed = computeValueForPlayer(name);
+      tdValue.textContent = formatValueNumber(computed);
+      if (computed > 0) { tdValue.style.color = posColorGlobal; tdValue.style.fontWeight = "700"; }
+      else if (computed < 0) { tdValue.style.color = negColorGlobal; tdValue.style.fontWeight = "400"; }
+      else { tdValue.style.color = zeroColorGlobal; tdValue.style.fontWeight = "400"; }
+      row.appendChild(tdValue);
+      valueCellMap[name] = tdValue;
 
-  tbody.appendChild(row);
-});
-
-const bottomRow = document.createElement("tr");
-bottomRow.classList.add(playerNames.length % 2 === 0 ? "even-row" : "odd-row");
-bottomRow.style.background = "rgba(0,0,0,0.03)";
-const bottomLabel = document.createElement("td");
-bottomLabel.style.padding = "6px";
-bottomLabel.style.fontWeight = "700";
-bottomLabel.style.textAlign = "center";
-bottomLabel.textContent = "GegNER";
-bottomRow.appendChild(bottomLabel);
-
-const goalValueOptions = [];
-for (let v=0; v<=10; v++) goalValueOptions.push((v*0.5).toFixed(1));
-
-const bottomStored = getGoalValueBottom();
-while (bottomStored.length < opponents.length) bottomStored.push(0);
-if (bottomStored.length > opponents.length) bottomStored.length = opponents.length;
-setGoalValueBottom(bottomStored);
-
-opponents.forEach((op, idx) => {
-  const td = document.createElement("td");
-  td.style.padding = "6px";
-  td.style.textAlign = "center";
-  const sel = document.createElement("select");
-  sel.style.width = "80px";
-  goalValueOptions.forEach(opt => {
-    const o = document.createElement("option");
-    o.value = opt;
-    o.textContent = opt;
-    sel.appendChild(o);
-  });
-  const b = getGoalValueBottom();
-  if (b && typeof b[idx] !== "undefined") sel.value = String(b[idx]);
-  sel.addEventListener("change", () => {
-    const arr = getGoalValueBottom();
-    arr[idx] = Number(sel.value);
-    setGoalValueBottom(arr);
-    Object.keys(valueCellMap).forEach(playerName => {
-      const el = valueCellMap[playerName];
-      if (el) { 
-        const comp = computeValueForPlayer(playerName);
-        el.textContent = formatValueNumber(comp);
-        if (comp > 0) { el.style.color = posColorGlobal; el.style.fontWeight = "700"; }
-        else if (comp < 0) { el.style.color = negColorGlobal; el.style.fontWeight = "400"; }
-        else { el.style.color = zeroColorGlobal; el.style.fontWeight = "400"; }
-      }
+      tbody.appendChild(row);
     });
-  });
-  td.appendChild(sel);
-  bottomRow.appendChild(td);
-});
 
-const tdEmptyForValue = document.createElement("td");
-tdEmptyForValue.style.padding = "6px";
-tdEmptyForValue.textContent = "";
-bottomRow.appendChild(tdEmptyForValue);
+    const bottomRow = document.createElement("tr");
+    bottomRow.classList.add(playerNames.length % 2 === 0 ? "even-row" : "odd-row");
+    bottomRow.style.background = "rgba(0,0,0,0.03)";
+    const bottomLabel = document.createElement("td");
+    bottomLabel.style.padding = "6px";
+    bottomLabel.style.fontWeight = "700";
+    bottomLabel.style.textAlign = "center";
+    bottomLabel.textContent = "GegNER";
+    bottomRow.appendChild(bottomLabel);
 
-tbody.appendChild(bottomRow);
-table.appendChild(tbody);
+    const goalValueOptions = [];
+    for (let v=0; v<=10; v++) goalValueOptions.push((v*0.5).toFixed(1));
 
-// Wrap goalvalue table in scroll wrapper so all columns are accessible
-const wrapper = document.createElement('div');
-wrapper.className = 'table-scroll';
-wrapper.style.width = '100%';
-wrapper.style.boxSizing = 'border-box';
-wrapper.appendChild(table);
+    const bottomStored = getGoalValueBottom();
+    while (bottomStored.length < opponents.length) bottomStored.push(0);
+    if (bottomStored.length > opponents.length) bottomStored.length = opponents.length;
+    setGoalValueBottom(bottomStored);
 
-goalValueContainer.appendChild(wrapper);
-}
+    opponents.forEach((op, idx) => {
+      const td = document.createElement("td");
+      td.style.padding = "6px";
+      td.style.textAlign = "center";
+      const sel = document.createElement("select");
+      sel.style.width = "80px";
+      goalValueOptions.forEach(opt => {
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        sel.appendChild(o);
+      });
+      const b = getGoalValueBottom();
+      if (b && typeof b[idx] !== "undefined") sel.value = String(b[idx]);
+      sel.addEventListener("change", () => {
+        const arr = getGoalValueBottom();
+        arr[idx] = Number(sel.value);
+        setGoalValueBottom(arr);
+        Object.keys(valueCellMap).forEach(playerName => {
+          const el = valueCellMap[playerName];
+          if (el) { 
+            const comp = computeValueForPlayer(playerName);
+            el.textContent = formatValueNumber(comp);
+            if (comp > 0) { el.style.color = posColorGlobal; el.style.fontWeight = "700"; }
+            else if (comp < 0) { el.style.color = negColorGlobal; el.style.fontWeight = "400"; }
+            else { el.style.color = zeroColorGlobal; el.style.fontWeight = "400"; }
+          }
+        });
+      });
+      td.appendChild(sel);
+      bottomRow.appendChild(td);
+    });
 
-function resetGoalValuePage() {
-  if (!confirm("⚠️ Goal Value zurücksetzen? Alle Spielerwerte auf 0 und Skalen auf 0 setzen.")) return;
-  const opponents = getGoalValueOpponents();
-  const playerNames = Object.keys(seasonData).length ? Object.keys(seasonData) : selectedPlayers.map(p=>p.name);
-  const newData = {};
-  playerNames.forEach(n => newData[n] = opponents.map(()=>0));
-  setGoalValueData(newData);
-  setGoalValueBottom(opponents.map(()=>0));
-  renderGoalValuePage();
-  alert("Goal Value zurückgezet.");
-}
+    const tdEmptyForValue = document.createElement("td");
+    tdEmptyForValue.style.padding = "6px";
+    tdEmptyForValue.textContent = "";
+    bottomRow.appendChild(tdEmptyForValue);
 
-// --- Final init and restore state on load ---
-seasonData = JSON.parse(localStorage.getItem("seasonData")) || seasonData || {};
+    tbody.appendChild(bottomRow);
+    table.appendChild(tbody);
 
-renderPlayerSelection();
+    // Wrap goalvalue table in scroll wrapper so all columns are accessible
+    const wrapper = document.createElement('div');
+    wrapper.className = 'table-scroll';
+    wrapper.style.width = '100%';
+    wrapper.style.boxSizing = 'border-box';
+    wrapper.appendChild(table);
 
-const lastPage = localStorage.getItem("currentPage") || (selectedPlayers.length ? "stats" : "selection");
-if (lastPage === "stats") {
-  showPageRef("stats");
-  renderStatsTable();
-  updateIceTimeColors();
-} else if (lastPage === "season") {
-  showPageRef("season");
-  renderSeasonTable();
-} else if (lastPage === "seasonMap") {
-  showPageRef("seasonMap");
-  renderSeasonMapPage();
-} else if (lastPage === "goalValue") {
-  showPageRef("goalValue");
-  renderGoalValuePage();
-} else {
-  showPageRef("selection");
-}
-
-updateTimerDisplay();
-
-// Save to localStorage on unload
-window.addEventListener("beforeunload", () => {
-  try {
-    localStorage.setItem("statsData", JSON.stringify(statsData));
-    localStorage.setItem("selectedPlayers", JSON.stringify(selectedPlayers));
-    localStorage.setItem("playerTimes", JSON.stringify(playerTimes));
-    localStorage.setItem("timerSeconds", String(timerSeconds));
-    localStorage.setItem("seasonData", JSON.stringify(seasonData));
-    localStorage.setItem("goalValueOpponents", JSON.stringify(getGoalValueOpponents()));
-    localStorage.setItem("goalValueData", JSON.stringify(getGoalValueData()));
-    localStorage.setItem("goalValueBottom", JSON.stringify(getGoalValueBottom()));
-  } catch (e) {
-    // ignore
+    goalValueContainer.appendChild(wrapper);
   }
-});
 
-// Robust: zentrale Delegation für alle Back-Buttons (registriert sofort)
-document.addEventListener('click', function (e) {
-  try {
-    const btn = e.target.closest && e.target.closest('button');
-    if (!btn) return;
-    const id = btn.id || '';
+  function resetGoalValuePage() {
+    if (!confirm("⚠️ Goal Value zurücksetzen? Alle Spielerwerte auf 0 und Skalen auf 0 setzen.")) return;
+    const opponents = getGoalValueOpponents();
+    const playerNames = Object.keys(seasonData).length ? Object.keys(seasonData) : selectedPlayers.map(p=>p.name);
+    const newData = {};
+    playerNames.forEach(n => newData[n] = opponents.map(()=>0));
+    setGoalValueData(newData);
+    setGoalValueBottom(opponents.map(()=>0));
+    renderGoalValuePage();
+    alert("Goal Value zurückgezet.");
+  }
 
-    const backButtonIds = new Set([
-      'backToStatsBtn',
-      'backToStatsFromSeasonBtn',
-      'backToStatsFromSeasonMapBtn',
-      'backFromGoalValueBtn'
-    ]);
+  // --- Final init and restore state on load ---
+  seasonData = JSON.parse(localStorage.getItem("seasonData")) || seasonData || {};
 
-    if (backButtonIds.has(id)) {
-      if (typeof window.showPage === 'function') {
-        window.showPage('stats');
-      } else if (typeof showPageRef === 'function') {
-        showPageRef('stats');
-      } else if (typeof showPage === 'function') {
-        showPage('stats');
-      } else {
-        document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-        const statsP = document.getElementById('statsPage');
-        if (statsP) statsP.style.display = 'block';
-      }
-      e.preventDefault();
-      e.stopPropagation();
+  renderPlayerSelection();
+
+  const lastPage = localStorage.getItem("currentPage") || (selectedPlayers.length ? "stats" : "selection");
+  if (lastPage === "stats") {
+    showPageRef("stats");
+    renderStatsTable();
+    updateIceTimeColors();
+  } else if (lastPage === "season") {
+    showPageRef("season");
+    renderSeasonTable();
+  } else if (lastPage === "seasonMap") {
+    showPageRef("seasonMap");
+    renderSeasonMapPage();
+  } else if (lastPage === "goalValue") {
+    showPageRef("goalValue");
+    renderGoalValuePage();
+  } else {
+    showPageRef("selection");
+  }
+
+  updateTimerDisplay();
+
+  // Save to localStorage on unload
+  window.addEventListener("beforeunload", () => {
+    try {
+      localStorage.setItem("statsData", JSON.stringify(statsData));
+      localStorage.setItem("selectedPlayers", JSON.stringify(selectedPlayers));
+      localStorage.setItem("playerTimes", JSON.stringify(playerTimes));
+      localStorage.setItem("timerSeconds", String(timerSeconds));
+      localStorage.setItem("seasonData", JSON.stringify(seasonData));
+      localStorage.setItem("goalValueOpponents", JSON.stringify(getGoalValueOpponents()));
+      localStorage.setItem("goalValueData", JSON.stringify(getGoalValueData()));
+      localStorage.setItem("goalValueBottom", JSON.stringify(getGoalValueBottom()));
+    } catch (e) {
+      // ignore
     }
-  } catch (err) {
-    console.warn('Back button delegation failed:', err);
-  }
-}, true);
+  });
+
+  // Robust: zentrale Delegation für alle Back-Buttons (registriert sofort)
+  document.addEventListener('click', function (e) {
+    try {
+      const btn = e.target.closest && e.target.closest('button');
+      if (!btn) return;
+      const id = btn.id || '';
+
+      const backButtonIds = new Set([
+        'backToStatsBtn',
+        'backToStatsFromSeasonBtn',
+        'backToStatsFromSeasonMapBtn',
+        'backFromGoalValueBtn'
+      ]);
+
+      if (backButtonIds.has(id)) {
+        if (typeof window.showPage === 'function') {
+          window.showPage('stats');
+        } else if (typeof showPageRef === 'function') {
+          showPageRef('stats');
+        } else if (typeof showPage === 'function') {
+          showPage('stats');
+        } else {
+          document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+          const statsP = document.getElementById('statsPage');
+          if (statsP) statsP.style.display = 'block';
+        }
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    } catch (err) {
+      console.warn('Back button delegation failed:', err);
+    }
+  }, true);
 
 });
