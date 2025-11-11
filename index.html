@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Spielerstatistik</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- NEU: optionale Styles für Goal Value Tabelle -->
+  <link rel="stylesheet" href="Create%20season_table_styles.css" />
   <!-- jsPDF (UMD) für PDF-Export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
@@ -237,6 +239,8 @@
   </div>
 
   <script src="app.js"></script>
+  <!-- NEU: Patch für Season-Tabelle und Goal-Value-UI -->
+  <script src="season_table_ui_patch.js"></script>
   <script src="season_map_momentum.js"></script>
 
   <!-- html2canvas for capturing momentum area (used by export) -->
