@@ -50,18 +50,27 @@ document.addEventListener("DOMContentLoaded", () => {
         margin-left: 0 !important;
       }
 
-      /* Zellen links ausrichten, für bessere Lesbarkeit bei vielen Spalten */
+      /* NEU: Standard mittig, später spezifische Ausnahmen */
       #seasonContainer table th, #seasonContainer table td,
       #goalValueContainer table th, #goalValueContainer table td {
-        text-align: left !important;
-        padding-left: 8px !important;
+        text-align: center !important;
+        padding-left: 0 !important;
       }
 
-      /* Falls die Seite einen globalen content-wrapper hat, der Zentrierung erzwingt,
-         entferne dessen horizontale padding/margin innerhalb der beiden Seiten */
-      #seasonPage .content-wrapper, #goalValuePage .content-wrapper {
-        padding-left: 0 !important;
-        margin-left: 0 !important;
+      /* Season: Nr + Spieler links */
+      #seasonContainer table th:nth-child(1),
+      #seasonContainer table td:nth-child(1),
+      #seasonContainer table th:nth-child(2),
+      #seasonContainer table td:nth-child(2) {
+        text-align: left !important;
+        padding-left: 12px !important;
+      }
+
+      /* Goal Value: Spieler links, Gegner-Spalten zentriert */
+      #goalValueContainer table th:first-child,
+      #goalValueContainer table td:first-child {
+        text-align: left !important;
+        padding-left: 12px !important;
       }
 
       /* Optional: kleine Pfeile für sichtbarere Scrollbar auf Desktop */
@@ -971,7 +980,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const markers = [];
       box.querySelectorAll(".marker-dot").forEach(dot => {
         const left = dot.style.left || "";
-               const top = dot.style.top || "";
+        const top = dot.style.top || "";
         const bg = dot.style.backgroundColor || "";
         const xPct = parseFloat(left.replace("%","")) || 0;
         const yPct = parseFloat(top.replace("%","")) || 0;
