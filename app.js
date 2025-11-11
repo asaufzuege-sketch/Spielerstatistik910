@@ -53,8 +53,12 @@ document.addEventListener("DOMContentLoaded", () => {
       /* Zellen links ausrichten, für bessere Lesbarkeit bei vielen Spalten */
       #seasonContainer table th, #seasonContainer table td,
       #goalValueContainer table th, #goalValueContainer table td {
-        text-align: left !important;
         padding-left: 8px !important;
+      }
+
+      /* Force header text centered for numeric columns, name column handled by JS */
+      #seasonContainer table thead th {
+        text-align: center !important;
       }
 
       /* Falls die Seite einen globalen content-wrapper hat, der Zentrierung erzwingt,
@@ -1873,7 +1877,9 @@ document.addEventListener("DOMContentLoaded", () => {
     container.style.display = 'flex';
     container.style.justifyContent = 'flex-start';
     container.style.alignItems = 'flex-start';
-    container.style.paddingLeft = container.style.paddingLeft || '8px';
+    // ENSURE NO LEFT GAP: force zero padding/margin so table sits flush to the left
+    container.style.paddingLeft = '0px';
+    container.style.marginLeft = '0px';
 
     const headerCols = [
       "Nr", "Spieler", "Games",
@@ -1892,6 +1898,24 @@ document.addEventListener("DOMContentLoaded", () => {
     table.style.borderCollapse = "separate";
     table.style.borderSpacing = "0";
 
+    // --- NEW: colgroup to set Nr (narrow) and Spieler (wider) columns ---
+    const colgroup = document.createElement("colgroup");
+    // Nr column: narrow
+    const colNr = document.createElement("col");
+    colNr.style.width = "48px";
+    colgroup.appendChild(colNr);
+    // Spieler column: wider to show full names
+    const colName = document.createElement("col");
+    colName.style.width = "320px";
+    colgroup.appendChild(colName);
+    // remaining columns: allow auto sizing
+    for (let i = 2; i < headerCols.length; i++) {
+      const c = document.createElement("col");
+      c.style.width = ""; // auto
+      colgroup.appendChild(c);
+    }
+    table.appendChild(colgroup);
+
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
     headerCols.forEach((h, idx) => {
@@ -1899,6 +1923,7 @@ document.addEventListener("DOMContentLoaded", () => {
       th.textContent = h;
       th.dataset.colIndex = idx;
       th.className = "sortable";
+      th.style.textAlign = "center"; // center header titles so values appear centered under them
       const arrow = document.createElement("span");
       arrow.className = "sort-arrow";
       arrow.style.marginLeft = "6px";
@@ -2026,10 +2051,25 @@ document.addEventListener("DOMContentLoaded", () => {
       r.cells.forEach((c, cellIdx) => {
         const td = document.createElement("td");
         td.textContent = c;
+        // By default center numeric/values so they're visually under headers
+        td.style.textAlign = "center";
+
         if (cellIdx === 1) {
+          // Spieler column: make wider and left-aligned so full name visible
           td.style.textAlign = "left";
           td.style.fontWeight = "700";
+          td.style.whiteSpace = "nowrap";
+          td.style.overflow = "visible";
+          td.style.textOverflow = "clip";
+          td.style.paddingLeft = "12px";
         }
+        // Reduce Nr column width visually (colgroup handles width, but ensure no extra padding)
+        if (cellIdx === 0) {
+          td.style.textAlign = "center";
+          td.style.paddingLeft = "6px";
+          td.style.paddingRight = "6px";
+        }
+
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
@@ -2043,6 +2083,7 @@ document.addEventListener("DOMContentLoaded", () => {
       th.style.color = headerTextColor;
       th.style.fontWeight = "700";
       th.style.padding = "8px";
+      th.style.textAlign = "center";
     });
 
     if (count > 0) {
@@ -2107,6 +2148,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (idx === 1) {
           td.style.textAlign = "left";
           td.style.fontWeight = "700";
+          td.style.paddingLeft = "12px";
+        } else {
+          td.style.textAlign = "center";
         }
         td.style.background = headerBgColor;
         td.style.color = headerTextColor;
@@ -2126,6 +2170,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (idx === 1) {
           td.style.textAlign = "left";
           td.style.fontWeight = "700";
+          td.style.paddingLeft = "12px";
+        } else {
+          td.style.textAlign = "center";
         }
         td.style.background = headerBgColor;
         td.style.color = headerTextColor;
@@ -2143,6 +2190,7 @@ document.addEventListener("DOMContentLoaded", () => {
     wrapper.className = 'table-scroll';
     wrapper.style.width = '100%';
     wrapper.style.boxSizing = 'border-box';
+    wrapper.style.marginLeft = '0px';
     wrapper.appendChild(table);
 
     container.appendChild(wrapper);
@@ -2853,10 +2901,10 @@ document.addEventListener("DOMContentLoaded", () => {
       valTd.style.textAlign = "center";
       valTd.className = "goalvalue-value";
       valTd.dataset.player = name;
-      const comp = computeValueForPlayer(name);
-      valTd.textContent = formatValueNumber(comp);
-      if (comp > 0) { valTd.style.color = posColorGlobal; valTd.style.fontWeight = "700"; }
-      else if (comp < 0) { valTd.style.color = negColorGlobal; valTd.style.fontWeight = "400"; }
+      const compVal = computeValueForPlayer(name);
+      valTd.textContent = formatValueNumber(compVal);
+      if (compVal > 0) { valTd.style.color = posColorGlobal; valTd.style.fontWeight = "700"; }
+      else if (compVal < 0) { valTd.style.color = negColorGlobal; valTd.style.fontWeight = "400"; }
       else { valTd.style.color = zeroColorGlobal; valTd.style.fontWeight = "400"; }
 
       valueCellMap[name] = valTd;
@@ -2881,32 +2929,4 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!confirm("⚠️ Goal Value zurücksetzen (alle Gegner & Werte)?")) return;
     try {
       localStorage.removeItem("goalValueData");
-      localStorage.removeItem("goalValueOpponents");
-      localStorage.removeItem("goalValueBottom");
-    } catch (e) {
-      console.warn("Error clearing goal value storage:", e);
-    }
-    try { renderGoalValuePage(); } catch (e) {}
-    try { renderSeasonTable(); } catch (e) {}
-    alert("Goal Value zurückgesetzt.");
-  }
-
-  // Ensure resetGoalValueBtn is properly wired (some DOMs attach earlier)
-  try {
-    resetGoalValueBtn?.removeEventListener?.("click", resetGoalValuePage);
-    resetGoalValueBtn?.addEventListener?.("click", resetGoalValuePage);
-  } catch (e) {}
-
-  // --- Initialization render calls (defensive) ---
-  try { renderPlayerSelection(); } catch (e) {}
-  try { renderStatsTable(); } catch (e) {}
-  try { renderSeasonTable(); } catch (e) {}
-  try { renderGoalValuePage(); } catch (e) {}
-
-  // show stored page if any
-  try {
-    const cur = localStorage.getItem("currentPage") || "selection";
-    showPage(cur);
-  } catch (e) {}
-
-}); // end DOMContentLoaded
+      localStorage.removeItem("goalValueOpp
