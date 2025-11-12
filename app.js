@@ -2897,3 +2897,155 @@ document.addEventListener("DOMContentLoaded", () => {
             valCell.textContent = formatValueNumber(comp);
             if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
             else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight =
+      const bottomRow = document.createElement("tr");
+      bottomRow.classList.add(playerNames.length % 2 === 0 ? "even-row" : "odd-row");
+      bottomRow.style.background = "rgba(0,0,0,0.03)";
+      const bottomLabel = document.createElement("td");
+      bottomLabel.style.padding = "6px";
+      bottomLabel.style.fontWeight = "700";
+      bottomLabel.style.textAlign = "center";
+      bottomLabel.textContent = "GegNER";
+      bottomRow.appendChild(bottomLabel);
+
+      const goalValueOptions = [];
+      for (let v=0; v<=10; v++) goalValueOptions.push((v*0.5).toFixed(1));
+
+      const bottomStored = getGoalValueBottom();
+      while (bottomStored.length < opponents.length) bottomStored.push(0);
+      if (bottomStored.length > opponents.length) bottomStored.length = opponents.length;
+      setGoalValueBottom(bottomStored);
+
+      opponents.forEach((op, idx) => {
+        const td = document.createElement("td");
+        td.style.padding = "6px";
+        td.style.textAlign = "center";
+        const sel = document.createElement("select");
+        sel.style.width = "80px";
+        goalValueOptions.forEach(opt => {
+          const o = document.createElement("option");
+          o.value = opt;
+          o.textContent = opt;
+          sel.appendChild(o);
+        });
+        const b = getGoalValueBottom();
+        if (b && typeof b[idx] !== "undefined") sel.value = String(b[idx]);
+        sel.addEventListener("change", () => {
+          const arr = getGoalValueBottom();
+          arr[idx] = Number(sel.value);
+          setGoalValueBottom(arr);
+          Object.keys(valueCellMap).forEach(playerName => {
+            const el = valueCellMap[playerName];
+            if (el) {
+              const comp = computeValueForPlayer(playerName);
+              el.textContent = formatValueNumber(comp);
+              if (comp > 0) { el.style.color = posColorGlobal; el.style.fontWeight = "700"; }
+              else if (comp < 0) { el.style.color = negColorGlobal; el.style.fontWeight = "400"; }
+              else { el.style.color = zeroColorGlobal; el.style.fontWeight = "400"; }
+            }
+          });
+        });
+        td.appendChild(sel);
+        bottomRow.appendChild(td);
+      });
+
+      const tdEmptyForValue = document.createElement("td");
+      tdEmptyForValue.style.padding = "6px";
+      tdEmptyForValue.textContent = "";
+      bottomRow.appendChild(tdEmptyForValue);
+
+      tbody.appendChild(bottomRow);
+      table.appendChild(tbody);
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'table-scroll';
+      wrapper.style.width = '100%';
+      wrapper.style.boxSizing = 'border-box';
+      wrapper.appendChild(table);
+
+      goalValueContainer.appendChild(wrapper);
+    }
+
+    function resetGoalValuePage() {
+      if (!confirm("⚠️ Goal Value zurücksetzen? Alle Spielerwerte auf 0 und Skalen auf 0 setzen.")) return;
+      const opponents = getGoalValueOpponents();
+      const playerNames = Object.keys(seasonData).length ? Object.keys(seasonData) : selectedPlayers.map(p=>p.name);
+      const newData = {};
+      playerNames.forEach(n => newData[n] = opponents.map(()=>0));
+      setGoalValueData(newData);
+      setGoalValueBottom(opponents.map(()=>0));
+      renderGoalValuePage();
+      alert("Goal Value zurückgezet.");
+    }
+
+    // --- Final init and restore state on load ---
+    seasonData = JSON.parse(localStorage.getItem("seasonData")) || seasonData || {};
+
+    renderPlayerSelection();
+
+    const lastPage = localStorage.getItem("currentPage") || (selectedPlayers.length ? "stats" : "selection");
+    if (lastPage === "stats") {
+      showPageRef("stats");
+      renderStatsTable();
+      updateIceTimeColors();
+    } else if (lastPage === "season") {
+      showPageRef("season");
+      renderSeasonTable();
+    } else if (lastPage === "seasonMap") {
+      showPageRef("seasonMap");
+      renderSeasonMapPage();
+    } else if (lastPage === "goalValue") {
+      showPageRef("goalValue");
+      renderGoalValuePage();
+    } else {
+      showPageRef("selection");
+    }
+
+    updateTimerDisplay();
+
+    window.addEventListener("beforeunload", () => {
+      try {
+        localStorage.setItem("statsData", JSON.stringify(statsData));
+        localStorage.setItem("selectedPlayers", JSON.stringify(selectedPlayers));
+        localStorage.setItem("playerTimes", JSON.stringify(playerTimes));
+        localStorage.setItem("timerSeconds", String(timerSeconds));
+        localStorage.setItem("seasonData", JSON.stringify(seasonData));
+        localStorage.setItem("goalValueOpponents", JSON.stringify(getGoalValueOpponents()));
+        localStorage.setItem("goalValueData", JSON.stringify(getGoalValueData()));
+        localStorage.setItem("goalValueBottom", JSON.stringify(getGoalValueBottom()));
+      } catch (e) {}
+    });
+
+    document.addEventListener('click', function (e) {
+      try {
+        const btn = e.target.closest && e.target.closest('button');
+        if (!btn) return;
+        const id = btn.id || '';
+
+        const backButtonIds = new Set([
+          'backToStatsBtn',
+          'backToStatsFromSeasonBtn',
+          'backToStatsFromSeasonMapBtn',
+          'backFromGoalValueBtn'
+        ]);
+
+        if (backButtonIds.has(id)) {
+          if (typeof window.showPage === 'function') {
+            window.showPage('stats');
+          } else if (typeof showPageRef === 'function') {
+            showPageRef('stats');
+          } else if (typeof showPage === 'function') {
+            showPage('stats');
+          } else {
+            document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+            const statsP = document.getElementById('statsPage');
+            if (statsP) statsP.style.display = 'block';
+          }
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      } catch (err) {
+        console.warn('Back button delegation failed:', err);
+      }
+    }, true);
+
+  });
