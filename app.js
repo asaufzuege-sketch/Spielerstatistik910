@@ -1753,6 +1753,171 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("exportBtn")?.addEventListener("click", exportStatsCSV);
 
+  // --- Export season data (season) to CSV ---
+  function exportSeasonCSV() {
+    try {
+      const names = Object.keys(seasonData || {});
+      if (!names.length) { alert("Keine Season-Daten vorhanden."); return; }
+
+      const header = [
+        "Nr","Spieler","Games",
+        "Goals","Assists","Points","+/-","Ø +/-",
+        "Shots","Shots/Game","Shots %","Goals/Game","Points/Game",
+        "Penalty","Goal Value","FaceOffs","FaceOffs Won","FaceOffs %","Time",
+        "MVP","MVP Points"
+      ];
+      const rows = [header];
+
+      const tmpRows = [];
+
+      names.forEach(name => {
+        const d = seasonData[name] || {};
+        const games = Number(d.games||0);
+        const goals = Number(d.goals||0);
+        const assists = Number(d.assists||0);
+        const points = goals + assists;
+        const plusMinus = Number(d.plusMinus||0);
+        const shots = Number(d.shots||0);
+        const penalty = Number(d.penaltys||0);
+        const faceOffs = Number(d.faceOffs||0);
+        const faceOffsWon = Number(d.faceOffsWon||0);
+        const faceOffsPercent = faceOffs ? Math.round((faceOffsWon/faceOffs)*100) : 0;
+        const timeSeconds = Number(d.timeSeconds||0);
+
+        const avgPlusMinus = games ? (plusMinus / games) : 0;
+        const shotsPerGame = games ? (shots / games) : 0;
+        const goalsPerGame = games ? (goals / games) : 0;
+        const pointsPerGame = games ? (points / games) : 0;
+        const shotsPercent = shots ? Math.round((goals / shots) * 100) : 0;
+
+        let goalValue = 0;
+        try {
+          if (typeof computeValueForPlayer === "function") {
+            goalValue = Number(computeValueForPlayer(name) || 0);
+          } else {
+            goalValue = Number(d.goalValue || 0);
+          }
+        } catch {
+          goalValue = Number(d.goalValue || 0);
+        }
+
+        const assistsPerGame = games ? (assists / games) : 0;
+        const penaltyPerGame = games ? (penalty / games) : 0;
+        const gvNum = Number(goalValue || 0);
+        const mvpPointsNum = (
+          (assistsPerGame * 8) +
+          (avgPlusMinus * 0.5) +
+          (shotsPerGame * 0.5) +
+          (goalsPerGame + (games ? (gvNum / games) * 10 : 0)) -
+          (penaltyPerGame * 1.2)
+        );
+        const mvpPointsRounded = Number(mvpPointsNum.toFixed(1));
+
+        const row = [
+          d.num || "",
+          name,
+          games,
+          goals,
+          assists,
+          points,
+          plusMinus,
+          avgPlusMinus.toFixed(1),
+          shots,
+          shotsPerGame.toFixed(1),
+          `${shotsPercent}%`,
+          goalsPerGame.toFixed(1),
+          pointsPerGame.toFixed(1),
+          penalty,
+          goalValue,
+          faceOffs,
+          faceOffsWon,
+          `${faceOffsPercent}%`,
+          formatTimeMMSS(timeSeconds),
+          "", // MVP rank, will fill later
+          mvpPointsRounded
+        ];
+        tmpRows.push(row);
+      });
+
+      // compute MVP ranks by MVP Points
+      const MVP_POINTS_IDX = header.indexOf("MVP Points");
+      const MVP_IDX = header.indexOf("MVP");
+      const allPoints = tmpRows.map(r => Number(r[MVP_POINTS_IDX]) || 0);
+      const sortedDescUnique = [...new Set(allPoints.slice().sort((a,b)=>b-a))];
+      function rankFor(val) {
+        const i = sortedDescUnique.indexOf(val);
+        return i === -1 ? "" : (i + 1);
+      }
+      tmpRows.forEach(r => { r[MVP_IDX] = rankFor(Number(r[MVP_POINTS_IDX]) || 0); });
+
+      rows.push(...tmpRows);
+
+      // Add total average row similar to renderSeasonTable
+      const count = tmpRows.length;
+      if (count) {
+        const idx = (label) => header.indexOf(label);
+        let sums = {
+          games: 0, goals: 0, assists: 0, points: 0, plusMinus: 0,
+          shots: 0, penalty: 0, faceOffs: 0, faceOffsWon: 0, timeSeconds: 0
+        };
+        tmpRows.forEach(r => {
+          sums.games += Number(r[idx("Games")])||0;
+          sums.goals += Number(r[idx("Goals")])||0;
+          sums.assists += Number(r[idx("Assists")])||0;
+          sums.points += Number(r[idx("Points")])||0;
+          sums.plusMinus += Number(r[idx("+/-")])||0;
+          sums.shots += Number(r[idx("Shots")])||0;
+          sums.penalty += Number(r[idx("Penalty")])||0;
+          sums.faceOffs += Number(r[idx("FaceOffs")])||0;
+          sums.faceOffsWon += Number(r[idx("FaceOffs Won")])||0;
+          const t = r[idx("Time")] || "00:00";
+          if (/^\d{2}:\d{2}$/.test(t)) {
+            const [mm, ss] = t.split(":").map(Number);
+            sums.timeSeconds += (mm * 60 + ss);
+          }
+        });
+
+        const avgShotsPercent = sums.shots ? Math.round((sums.goals / sums.shots) * 100) : 0;
+        const avgFacePercent = sums.faceOffs ? Math.round((sums.faceOffsWon / sums.faceOffs) * 100) : 0;
+        const avgTime = Math.round(sums.timeSeconds / count);
+
+        const totalRow = new Array(header.length).fill("");
+        totalRow[idx("Spieler")] = "Total Ø";
+        totalRow[idx("Games")] = (sums.games / count).toFixed(1);
+        totalRow[idx("Goals")] = (sums.goals / count).toFixed(1);
+        totalRow[idx("Assists")] = (sums.assists / count).toFixed(1);
+        totalRow[idx("Points")] = (sums.points / count).toFixed(1);
+        totalRow[idx("+/-")] = (sums.plusMinus / count).toFixed(1);
+        totalRow[idx("Ø +/-")] = (sums.plusMinus / count).toFixed(1);
+        totalRow[idx("Shots")] = (sums.shots / count).toFixed(1);
+        totalRow[idx("Shots/Game")] = ((sums.shots / count) / ((sums.games / count) || 1)).toFixed(1);
+        totalRow[idx("Shots %")] = `${avgShotsPercent}%`;
+        totalRow[idx("Goals/Game")] = ((sums.goals / count) / ((sums.games / count) || 1)).toFixed(1);
+        totalRow[idx("Points/Game")] = ((sums.points / count) / ((sums.games / count) || 1)).toFixed(1);
+        totalRow[idx("Penalty")] = (sums.penalty / count).toFixed(1);
+        totalRow[idx("FaceOffs")] = (sums.faceOffs / count).toFixed(1);
+        totalRow[idx("FaceOffs Won")] = (sums.faceOffsWon / count).toFixed(1);
+        totalRow[idx("FaceOffs %")] = `${avgFacePercent}%`;
+        totalRow[idx("Time")] = formatTimeMMSS(avgTime);
+
+        rows.push(totalRow);
+      }
+
+      const csv = rows.map(r => r.join(";")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "season.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      console.error("Export Season CSV failed:", e);
+      alert("Fehler beim Season-CSV-Export (siehe Konsole).");
+    }
+  }
+
+  document.getElementById("exportSeasonBtn")?.addEventListener("click", exportSeasonCSV);
+
   // --- Season table rendering ---
   function parseForSort(val) {
     if (val === null || val === undefined) return "";
@@ -2731,231 +2896,4 @@ document.addEventListener("DOMContentLoaded", () => {
             const comp = computeValueForPlayer(name);
             valCell.textContent = formatValueNumber(comp);
             if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
-            else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
-            else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
-          }
-        });
-
-        let lastTap = 0;
-        td.addEventListener("touchstart", (e) => {
-          const now = Date.now();
-          const diff = now - lastTap;
-          if (diff < 300) {
-            e.preventDefault();
-            if (clickTimeout) { clearTimeout(clickTimeout); clickTimeout = null; }
-            const all = getGoalValueData();
-            if (!all[name]) all[name] = opponents.map(()=>0);
-            all[name][idx] = Math.max(0, (Number(all[name][idx]||0) - 1));
-            setGoalValueData(all);
-            td.textContent = String(all[name][idx]);
-            const nv = Number(all[name][idx] || 0);
-            if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
-            else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
-            else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
-
-            const valCell = valueCellMap[name];
-            if (valCell) {
-              const comp = computeValueForPlayer(name);
-              valCell.textContent = formatValueNumber(comp);
-              if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
-              else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
-              else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
-            }
-            lastTap = 0;
-          } else {
-            lastTap = now;
-            setTimeout(() => {
-              if (lastTap !== 0) {
-                const all = getGoalValueData();
-                if (!all[name]) all[name] = opponents.map(()=>0);
-                all[name][idx] = Math.max(0, (Number(all[name][idx]||0) + 1));
-                setGoalValueData(all);
-                td.textContent = String(all[name][idx]);
-                const nv = Number(all[name][idx] || 0);
-                if (nv > 0) { td.style.color = posColorGlobal; td.style.fontWeight = "700"; }
-                else if (nv < 0) { td.style.color = negColorGlobal; td.style.fontWeight = "400"; }
-                else { td.style.color = zeroColorGlobal; td.style.fontWeight = "400"; }
-
-                const valCell = valueCellMap[name];
-                if (valCell) { 
-                  const comp = computeValueForPlayer(name);
-                  valCell.textContent = formatValueNumber(comp);
-                  if (comp > 0) { valCell.style.color = posColorGlobal; valCell.style.fontWeight = "700"; }
-                  else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight = "400"; }
-                  else { valCell.style.color = zeroColorGlobal; valCell.style.fontWeight = "400"; }
-                }
-                lastTap = 0;
-              }
-            }, 300);
-          }
-        }, { passive: true });
-
-        row.appendChild(td);
-      });
-
-      const tdValue = document.createElement("td");
-      tdValue.style.padding = "6px";
-      tdValue.style.textAlign = "center";
-      const computed = computeValueForPlayer(name);
-      tdValue.textContent = formatValueNumber(computed);
-      if (computed > 0) { tdValue.style.color = posColorGlobal; tdValue.style.fontWeight = "700"; }
-      else if (computed < 0) { tdValue.style.color = negColorGlobal; tdValue.style.fontWeight = "400"; }
-      else { tdValue.style.color = zeroColorGlobal; tdValue.style.fontWeight = "400"; }
-      row.appendChild(tdValue);
-      valueCellMap[name] = tdValue;
-
-      tbody.appendChild(row);
-    });
-
-    const bottomRow = document.createElement("tr");
-    bottomRow.classList.add(playerNames.length % 2 === 0 ? "even-row" : "odd-row");
-    bottomRow.style.background = "rgba(0,0,0,0.03)";
-    const bottomLabel = document.createElement("td");
-    bottomLabel.style.padding = "6px";
-    bottomLabel.style.fontWeight = "700";
-    bottomLabel.style.textAlign = "center";
-    bottomLabel.textContent = "GegNER";
-    bottomRow.appendChild(bottomLabel);
-
-    const goalValueOptions = [];
-    for (let v=0; v<=10; v++) goalValueOptions.push((v*0.5).toFixed(1));
-
-    const bottomStored = getGoalValueBottom();
-    while (bottomStored.length < opponents.length) bottomStored.push(0);
-    if (bottomStored.length > opponents.length) bottomStored.length = opponents.length;
-    setGoalValueBottom(bottomStored);
-
-    opponents.forEach((op, idx) => {
-      const td = document.createElement("td");
-      td.style.padding = "6px";
-      td.style.textAlign = "center";
-      const sel = document.createElement("select");
-      sel.style.width = "80px";
-      goalValueOptions.forEach(opt => {
-        const o = document.createElement("option");
-        o.value = opt;
-        o.textContent = opt;
-        sel.appendChild(o);
-      });
-      const b = getGoalValueBottom();
-      if (b && typeof b[idx] !== "undefined") sel.value = String(b[idx]);
-      sel.addEventListener("change", () => {
-        const arr = getGoalValueBottom();
-        arr[idx] = Number(sel.value);
-        setGoalValueBottom(arr);
-        Object.keys(valueCellMap).forEach(playerName => {
-          const el = valueCellMap[playerName];
-            if (el) { 
-              const comp = computeValueForPlayer(playerName);
-              el.textContent = formatValueNumber(comp);
-              if (comp > 0) { el.style.color = posColorGlobal; el.style.fontWeight = "700"; }
-              else if (comp < 0) { el.style.color = negColorGlobal; el.style.fontWeight = "400"; }
-              else { el.style.color = zeroColorGlobal; el.style.fontWeight = "400"; }
-            }
-        });
-      });
-      td.appendChild(sel);
-      bottomRow.appendChild(td);
-    });
-
-    const tdEmptyForValue = document.createElement("td");
-    tdEmptyForValue.style.padding = "6px";
-    tdEmptyForValue.textContent = "";
-    bottomRow.appendChild(tdEmptyForValue);
-
-    tbody.appendChild(bottomRow);
-    table.appendChild(tbody);
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'table-scroll';
-    wrapper.style.width = '100%';
-    wrapper.style.boxSizing = 'border-box';
-    wrapper.appendChild(table);
-
-    goalValueContainer.appendChild(wrapper);
-  }
-
-  function resetGoalValuePage() {
-    if (!confirm("⚠️ Goal Value zurücksetzen? Alle Spielerwerte auf 0 und Skalen auf 0 setzen.")) return;
-    const opponents = getGoalValueOpponents();
-    const playerNames = Object.keys(seasonData).length ? Object.keys(seasonData) : selectedPlayers.map(p=>p.name);
-    const newData = {};
-    playerNames.forEach(n => newData[n] = opponents.map(()=>0));
-    setGoalValueData(newData);
-    setGoalValueBottom(opponents.map(()=>0));
-    renderGoalValuePage();
-    alert("Goal Value zurückgezet.");
-  }
-
-  // --- Final init and restore state on load ---
-  seasonData = JSON.parse(localStorage.getItem("seasonData")) || seasonData || {};
-
-  renderPlayerSelection();
-
-  const lastPage = localStorage.getItem("currentPage") || (selectedPlayers.length ? "stats" : "selection");
-  if (lastPage === "stats") {
-    showPageRef("stats");
-    renderStatsTable();
-    updateIceTimeColors();
-  } else if (lastPage === "season") {
-    showPageRef("season");
-    renderSeasonTable();
-  } else if (lastPage === "seasonMap") {
-    showPageRef("seasonMap");
-    renderSeasonMapPage();
-  } else if (lastPage === "goalValue") {
-    showPageRef("goalValue");
-    renderGoalValuePage();
-  } else {
-    showPageRef("selection");
-  }
-
-  updateTimerDisplay();
-
-  window.addEventListener("beforeunload", () => {
-    try {
-      localStorage.setItem("statsData", JSON.stringify(statsData));
-      localStorage.setItem("selectedPlayers", JSON.stringify(selectedPlayers));
-      localStorage.setItem("playerTimes", JSON.stringify(playerTimes));
-      localStorage.setItem("timerSeconds", String(timerSeconds));
-      localStorage.setItem("seasonData", JSON.stringify(seasonData));
-      localStorage.setItem("goalValueOpponents", JSON.stringify(getGoalValueOpponents()));
-      localStorage.setItem("goalValueData", JSON.stringify(getGoalValueData()));
-      localStorage.setItem("goalValueBottom", JSON.stringify(getGoalValueBottom()));
-    } catch (e) {}
-  });
-
-  document.addEventListener('click', function (e) {
-    try {
-      const btn = e.target.closest && e.target.closest('button');
-      if (!btn) return;
-      const id = btn.id || '';
-
-      const backButtonIds = new Set([
-        'backToStatsBtn',
-        'backToStatsFromSeasonBtn',
-        'backToStatsFromSeasonMapBtn',
-        'backFromGoalValueBtn'
-      ]);
-
-      if (backButtonIds.has(id)) {
-        if (typeof window.showPage === 'function') {
-          window.showPage('stats');
-        } else if (typeof showPageRef === 'function') {
-          showPageRef('stats');
-        } else if (typeof showPage === 'function') {
-          showPage('stats');
-        } else {
-          document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-          const statsP = document.getElementById('statsPage');
-          if (statsP) statsP.style.display = 'block';
-        }
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    } catch (err) {
-      console.warn('Back button delegation failed:', err);
-    }
-  }, true);
-
-});
+            else if (comp < 0) { valCell.style.color = negColorGlobal; valCell.style.fontWeight =
