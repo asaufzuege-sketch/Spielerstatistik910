@@ -1,42 +1,29 @@
 :root {
-  /* Grundfarben Light Mode */
   --bg-color: #ffffff;
   --text-color: #000000;
   --header-bg: #1E1E1E;
   --row-even: #f0f0f0;
   --row-odd: #e0e0e0;
-
-  /* Seiten-Titelfarben / Gradient */
-  --page-title-start: #7dceb6; /* oben links */
-  --page-title-end: #66a895;   /* unten rechts */
-
-  /* Tabellenfarben */
+  --page-title-start: #7dceb6;
+  --page-title-end: #66a895;
   --cell-pos-color: #00c06f;
   --cell-neg-color: #ff4c4c;
   --cell-zero-color: #000000;
-
-  /* Buttons / Timer */
   --btn-top-bg: #c8fbc8;
   --btn-bottom-bg: #ffe7e7;
   --timer-active-color: #005c2f;
   --timer-left-bg: #3b3b3b;
-
-  /* Layout */
   --sticky-header-height: 56px;
-
-  /* Torbildfarben */
   --ice-top: #00c06f;
   --ice-bottom: #ff4c4c;
 }
 
-/* Dark Mode */
 [data-theme="dark"] {
   --bg-color: #111111;
   --text-color: #ffffff;
   --header-bg: #1E1E1E;
   --row-even: #333333;
   --row-odd: #4a4a4a;
-
   --cell-pos-color: #00ff80;
   --cell-neg-color: #ff4c4c;
   --cell-zero-color: #ffffff;
@@ -60,23 +47,11 @@ body {
   max-width: 1100px;
 }
 
-/* Page-top: per-page container for centered buttons */
-.page-top {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 10px;
-}
-
-/* =========================================
-   TYPOGRAFIE / TITEL
-   ========================================= */
-/* Seiten-Titel: gradient text, uppercase */
 h1 {
   text-align: center;
   margin: 0 0 12px 0;
   text-transform: uppercase;
   font-weight: 700;
-  /* gradient text using background-clip */
   background: linear-gradient(135deg, var(--page-title-start) 0%, var(--page-title-end) 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -84,7 +59,6 @@ h1 {
   color: transparent;
 }
 
-/* Larger title appearance for specific pages */
 #goalValuePage h1,
 #seasonPage h1,
 #seasonMapPage h1,
@@ -94,23 +68,14 @@ h1 {
   margin: 0 0 12px 0;
 }
 
-/* center text, small */
-.center-text {
-  text-align: center;
-  color: #888;
-  margin-top: 6px;
-}
+.center-text { text-align: center; color: #888; margin-top: 6px; }
 
-/* =========================================
-   SPIELERAUSWAHL
-   ========================================= */
 .player-list {
   list-style: none;
   padding: 0;
   margin: 20px auto;
   max-width: 600px;
 }
-
 .player-list li {
   display: flex;
   align-items: center;
@@ -121,25 +86,18 @@ h1 {
   padding: 8px 12px;
   margin: 6px 0;
 }
-
-.player-list li span {
-  color: #fff;
-}
-
-/* Checkbox-Farbe on selection page */
+.player-list li span { color: #fff; }
 #playerSelectionPage input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: #e3fba7; /* neue Checkbox-Farbe */
+  accent-color: #e3fba7;
 }
-
 .player-list .num {
   width: 48px;
   text-align: center;
   font-weight: 700;
   color: #fff;
 }
-
 .player-list input[type="text"] {
   background: var(--row-even);
   color: var(--text-color);
@@ -149,7 +107,6 @@ h1 {
   flex: 1;
 }
 
-/* Confirm button on selection page (new color) */
 #playerSelectionPage .confirm-btn {
   display: block;
   margin: 20px auto;
@@ -167,28 +124,25 @@ h1 {
 }
 #playerSelectionPage .confirm-btn:hover { filter: brightness(0.98); }
 
-/* =========================================
-   TOP BAR / BUTTONS
-   ========================================= */
-/* Anpassung: alle Buttons in einer Reihe, bei Platzmangel horizontal scrollbar */
+/* TOP BAR */
 .top-bar {
   display: flex;
-  flex-wrap: nowrap;          /* keine Umbrüche: alle Buttons in einer Reihe */
+  flex-wrap: nowrap;
   gap: 8px;
-  justify-content: flex-start; /* linksbündig; Buttons nebeneinander */
+  justify-content: flex-start;
   padding: 8px 0;
-  overflow-x: auto;           /* bei Platzmangel horizontal scrollen */
+  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Equal spacing specifically for Season page top-bar */
 #seasonPage .top-bar {
-  gap: 12px; /* exactly equal spacing between buttons on Season page */
+  gap: 12px;
   justify-content: flex-start;
 }
 
-/* Base top button styling - uniform height; not bold (except reset) */
-.top-btn {
+/* Basis für alle Buttons (inkl. Import) */
+.top-btn,
+.import-csv-btn {
   background: #2b2b2b;
   color: #fff;
   border: none;
@@ -204,16 +158,16 @@ h1 {
   font-weight: 400;
   box-sizing: border-box;
   flex: 0 0 auto;
+  min-width: 140px; /* Einheitliche Mindestbreite */
 }
-.top-btn:hover { background: #3b3b3b; }
+.top-btn:hover,
+.import-csv-btn:hover { background: #3b3b3b; }
 
-/* special lighter timer on the left - increase font size and bold */
-.top-btn.timer-left {
-  background: var(--timer-left-bg);
-}
+/* Spezielle Farben überschreiben nur Hintergrund/Text, nicht Größe */
+.top-btn.timer-left { background: var(--timer-left-bg); }
 .timer {
-  font-size: 1.25rem;    /* larger */
-  font-weight: 700;      /* bold */
+  font-size: 1.25rem;
+  font-weight: 700;
   padding: 10px 16px;
   transition: background-color 0.25s;
   height: 40px;
@@ -225,41 +179,21 @@ h1 {
 .timer.stopped { background: #b00020; }
 .timer.reset { background: var(--timer-left-bg); }
 
-/* Export CSV button (used on Game Data and Season pages) - same color everywhere */
-.top-btn.export-csv {
-  background: #46798e;
-  color: #fff;
-}
+.top-btn.export-csv { background: #46798e; color: #fff; }
 .top-btn.export-csv:hover { filter: brightness(0.95); }
 
-/* Season highlight */
-.top-btn.season-highlight {
-  background: #44bb91;
-  color: #fff;
-}
+.top-btn.season-highlight { background: #44bb91; color: #fff; }
 .top-btn.season-highlight:hover { filter: brightness(0.95); }
 
-/* Export Season (from stats) button color kept distinct */
-.top-btn.export-season {
-  background: #e3fba7;
-  color: #000;
-}
+.top-btn.export-season { background: #e3fba7; color: #000; }
 .top-btn.export-season:hover { filter: brightness(0.95); }
 
-/* Import CSV button (dynamically created) - ensure it matches top-btn sizing */
-.import-csv-btn {
-  background: #010741;
-  color: #fff;
-}
+.import-csv-btn { background: #010741; color: #fff; } /* behält Größe durch gemeinsame Basis */
 
-/* Danger / reset buttons - Reset remains bold */
 .danger-btn { background: #8b0000; color: #fff; }
 .danger-btn:hover { background: #a30000; }
 .reset-btn { font-weight: 700; }
 
-/* =========================================
-   STATISTIK-TABELLE
-   ========================================= */
 #statsScrollContainer { max-height: none; overflow-y: visible; }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
@@ -288,15 +222,12 @@ th, td {
 td[data-player] { cursor: pointer; transition: transform 0.08s, background 0.08s; }
 td[data-player]:active { transform: scale(1.12); background: #222; }
 
-/* Time button read-only appearance */
 .time-btn[disabled], .time-btn.disabled-readonly { opacity: 0.7; cursor: default; pointer-events: none; filter: brightness(0.95); }
 
 th.sortable { user-select: none; }
 th .sort-arrow { font-size: 0.7rem; color: #ddd }
 
-/* =========================================
-   TORBILD / GOAL MAP
-   ========================================= */
+/* TORBILD */
 .torbild-layout {
   display: flex;
   justify-content: space-between;
@@ -331,9 +262,7 @@ th .sort-arrow { font-size: 0.7rem; color: #ddd }
   cursor: pointer;
 }
 
-/* =========================================
-   ZEITERFASSUNG
-   ========================================= */
+/* ZEITERFASSUNG */
 .time-tracking-box {
   display: flex;
   flex-direction: column;
@@ -380,51 +309,46 @@ th .sort-arrow { font-size: 0.7rem; color: #ddd }
 .period-buttons.bottom-row .time-btn:hover { background-color: #ffd3d3; }
 .time-btn:active { transform: scale(1.05); }
 
-/* =========================================
-   SEASON PAGE & TOTAL ROW
-   ========================================= */
-/* Make season table sit left and not centered; allow horizontal scrolling if needed */
+/* SEASON PAGE */
 #seasonPage table { width: auto; table-layout: auto; border-collapse: collapse; font-size: 0.95rem; margin: 0; }
-
-/* Column sizing: Nr narrow, Spieler wider so full names show, values centered under headers */
-#seasonPage th, #seasonPage td { padding: 8px 6px; text-align: center; border-bottom: 1px solid #333; color: var(--text-color); white-space: nowrap; }
-
-#seasonPage thead th { background: var(--header-bg); position: sticky; top: 0; z-index: 40; padding: 8px 6px; border-bottom: 2px solid #333; text-align:center; }
-
-/* Nr column narrow */
+#seasonPage th, #seasonPage td {
+  padding: 8px 6px;
+  text-align: center;
+  border-bottom: 1px solid #333;
+  color: var(--text-color);
+  white-space: nowrap;
+}
+#seasonPage thead th {
+  background: var(--header-bg);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 8px 6px;
+  border-bottom: 2px solid #333;
+  text-align:center;
+}
 #seasonPage thead th:nth-child(1), #seasonPage tbody td:nth-child(1) {
   width: 36px;
   min-width: 36px;
   max-width: 36px;
   text-align: center;
 }
-
-/* Spieler column wider and keep full name visible */
 #seasonPage thead th:nth-child(2), #seasonPage tbody td:nth-child(2) {
   text-align: left;
-  white-space: nowrap; /* keep name in single line and force column width */
+  white-space: nowrap;
   font-weight: 700;
   padding-left: 12px;
 }
+#seasonPage tbody tr:nth-child(odd) { background-color: var(--row-odd); }
+#seasonPage tbody tr:nth-child(even) { background-color: var(--row-even); }
 
-/* All other value columns centered */
-#seasonPage tbody td:not(:nth-child(2)), #seasonPage thead th:not(:nth-child(2)) {
-  text-align: center;
-  white-space: nowrap;
+#seasonPage .total-row td {
+  background: var(--header-bg) !important;
+  color: var(--text-color) !important;
+  font-weight:700 !important;
+  border-top:2px solid #333;
 }
 
-/* Striped rows for season table */
-#seasonPage tbody tr:nth-child(odd) {
-  background-color: var(--row-odd);
-}
-#seasonPage tbody tr:nth-child(even) {
-  background-color: var(--row-even);
-}
-
-/* Total row styling */
-#seasonPage .total-row td { background: var(--header-bg) !important; color: var(--text-color) !important; font-weight:700 !important; border-top:2px solid #333; }
-
-/* goalvalue input styling */
 .goalvalue-title-input {
   background: transparent;
   border: 1px solid rgba(255,255,255,0.08);
@@ -434,9 +358,67 @@ th .sort-arrow { font-size: 0.7rem; color: #ddd }
   text-align: center;
 }
 
-/* responsive */
+/* Goal Value Tabellen-Optik (ergänzend zu Patch-Script) */
+.goal-value-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 13px;
+  margin-top: 6px;
+}
+.goal-value-table tbody tr:nth-child(odd) { background: var(--row-odd); }
+.goal-value-table tbody tr:nth-child(even) { background: var(--row-even); }
+.goal-value-table td, .goal-value-table th {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  text-align: center;
+}
+.goal-value-table tbody tr:hover { background: #eef6ff; }
+.gv-cell { cursor: pointer; font-weight: 600; user-select: none; }
+.gv-scale {
+  cursor: pointer;
+  color: #fff;
+  background: rgba(0,0,0,0.35);
+  padding: 4px 6px;
+  border-radius: 6px;
+  display: inline-block;
+  font-weight: 700;
+}
+.inline-editor {
+  padding: 4px 6px;
+  border: 1px solid #cfcfcf;
+  border-radius: 4px;
+  width: 64px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+/* Momentum Container */
+#seasonMapMomentumContainer {
+  width: 100%;
+  max-width: 1100px;
+  margin: 12px auto 0 auto;
+  border-radius: 8px;
+  background: transparent;
+  box-sizing: border-box;
+  padding: 2px 6px 6px 6px;
+}
+#seasonMapMomentumContainer svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+}
+#seasonMapMomentumContainer text {
+  dominant-baseline: middle;
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 11px;
+}
+
+/* Responsive */
 @media (max-width: 900px) {
   .torbild-layout { flex-direction: column; height: auto; }
   .goalvalue-title-input { font-size: 0.85rem; }
   .top-bar { gap: 6px; }
+  .top-btn, .import-csv-btn { min-width: 120px; } /* etwas schmaler mobil */
 }
